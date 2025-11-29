@@ -49,6 +49,7 @@ dependencies:
   provider: ^6.1.2
   path: ^1.9.1
   path_provider: ^2.1.5
+  shared_preferences: ^2.3.3
   
   # Thumbnail generation
   video_thumbnail: ^0.5.3

@@ -7,6 +7,8 @@ import '../models/folder_item.dart';
 
 class MediaScanner {
   static const platform = MethodChannel('com.example.media_player_app/storage');
+  static bool _isRequestingPermissions = false;
+  static bool? _hasPermissions;
 
   static final List<String> _audioExtensions = [
     '.mp3',
@@ -32,13 +34,56 @@ class MediaScanner {
   ];
 
   static Future<bool> requestPermissions() async {
-    if (Platform.isAndroid) {
-      final storage = await Permission.storage.request();
-      if (storage.isGranted) return true;
-
-      final manageStorage = await Permission.manageExternalStorage.request();
-      return manageStorage.isGranted;
+    // If already requesting, wait for the current request to complete
+    if (_isRequestingPermissions) {
+      // Wait for up to 5 seconds for the permission request to complete
+      for (int i = 0; i < 50; i++) {
+        await Future.delayed(const Duration(milliseconds: 100));
+        if (!_isRequestingPermissions) {
+          return _hasPermissions ?? false;
+        }
+      }
+      return false;
     }
+
+    // If we already have cached permission status, return it
+    if (_hasPermissions != null) {
+      return _hasPermissions!;
+    }
+
+    if (Platform.isAndroid) {
+      _isRequestingPermissions = true;
+      try {
+        // Check current status first
+        final storageStatus = await Permission.storage.status;
+        final manageStorageStatus =
+            await Permission.manageExternalStorage.status;
+
+        if (storageStatus.isGranted || manageStorageStatus.isGranted) {
+          _hasPermissions = true;
+          return true;
+        }
+
+        // Request permissions one at a time to avoid conflicts
+        final storage = await Permission.storage.request();
+        if (storage.isGranted) {
+          _hasPermissions = true;
+          return true;
+        }
+
+        final manageStorage = await Permission.manageExternalStorage.request();
+        _hasPermissions = manageStorage.isGranted;
+        return _hasPermissions!;
+      } catch (e) {
+        // Silently handle permission errors
+        _hasPermissions = false;
+        return false;
+      } finally {
+        _isRequestingPermissions = false;
+      }
+    }
+
+    _hasPermissions = true;
     return true;
   }
 
@@ -68,7 +113,7 @@ class MediaScanner {
         }
       }
     } catch (e) {
-      print('Error scanning files: $e');
+      // Silently handle scanning errors
     }
 
     final folders = folderMap.entries
@@ -97,11 +142,9 @@ class MediaScanner {
         final List<dynamic> storagePaths = await platform.invokeMethod(
           'getStoragePaths',
         );
-        print('📱 Found ${storagePaths.length} storage volumes from Android');
 
         for (var storagePath in storagePaths) {
           final path = storagePath.toString();
-          print('Storage volume: $path');
 
           final storage = Directory(path);
           if (await storage.exists()) {
@@ -121,8 +164,7 @@ class MediaScanner {
           }
         }
       } catch (e) {
-        print('❌ Error getting storage paths from Android: $e');
-        // Fallback to default internal storage
+        // Fallback to default internal storage if native method fails
         final externalStorage = Directory('/storage/emulated/0');
         if (await externalStorage.exists()) {
           directories.addAll([
@@ -139,8 +181,6 @@ class MediaScanner {
           ]);
         }
       }
-
-      print('✅ Total directories to scan: ${directories.length}');
     }
     return directories;
   }
@@ -170,7 +210,6 @@ class MediaScanner {
 
             folderMap.putIfAbsent(folderPath, () => []);
             folderMap[folderPath]!.add(mediaItem);
-            print('Found ${type.name}: $title at $folderPath');
           }
         } else if (entity is Directory) {
           final dirName = p.basename(entity.path).toLowerCase();
@@ -181,9 +220,10 @@ class MediaScanner {
           }
         }
       }
+    } on FileSystemException {
+      // Skip inaccessible directories (permission denied, etc.)
     } catch (e) {
-      // Skip inaccessible directories
-      print('Cannot scan ${dir.path}: $e');
+      // Skip other errors silently
     }
   }
 

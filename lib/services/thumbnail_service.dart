@@ -24,7 +24,7 @@ class ThumbnailService {
       // Read audio tags including artwork
       final tag = await AudioTags.read(audioPath);
 
-      if (tag != null && tag.pictures != null && tag.pictures.isNotEmpty) {
+      if (tag != null && tag.pictures.isNotEmpty) {
         // Cache and return the first picture (album art)
         final thumbnail = tag.pictures.first.bytes;
         _audioThumbnailCache[audioPath] = thumbnail;

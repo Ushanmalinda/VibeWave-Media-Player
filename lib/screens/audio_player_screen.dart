@@ -5,6 +5,9 @@ import '../models/folder_item.dart';
 import '../services/media_scanner.dart';
 import '../services/thumbnail_service.dart';
 import '../services/playback_manager.dart';
+import '../services/favorites_service.dart';
+import '../services/queue_service.dart';
+import '../services/audio_player_service.dart';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -16,7 +19,7 @@ class AudioPlayerScreen extends StatefulWidget {
 }
 
 class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayer _audioPlayer = AudioPlayerService().player;
   final PlaybackManager _playbackManager = PlaybackManager();
   List<FolderItem> _folders = [];
   List<MediaItem> _playlist = [];
@@ -36,6 +39,19 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     super.initState();
     _setupAudioPlayer();
     _scanMediaFiles();
+    FavoritesService().initialize();
+    FavoritesService().addListener(_onFavoritesChanged);
+  }
+
+  void _onFavoritesChanged() {
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    FavoritesService().removeListener(_onFavoritesChanged);
+    // Don't dispose the singleton audio player
+    super.dispose();
   }
 
   void _setupAudioPlayer() {
@@ -86,6 +102,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       _isInFolderView = false;
       _currentIndex = -1;
     });
+    // Update queue service
+    QueueService().setQueue(folder.mediaFiles);
   }
 
   void _backToFolders() {
@@ -100,6 +118,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
 
     setState(() => _currentIndex = index);
     _playbackManager.updateCurrentlyPlaying(_playlist[index]);
+    QueueService().setCurrentIndex(index);
 
     try {
       await _audioPlayer.setFilePath(_playlist[index].path);
@@ -184,12 +203,6 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       return '$hours:${twoDigits(minutes)}:${twoDigits(seconds)}';
     }
     return '${twoDigits(minutes)}:${twoDigits(seconds)}';
-  }
-
-  @override
-  void dispose() {
-    _audioPlayer.dispose();
-    super.dispose();
   }
 
   @override
@@ -367,9 +380,76 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                 color: Colors.white.withOpacity(0.6),
               ),
             ),
-            trailing: Icon(
-              Icons.chevron_right,
-              color: Colors.white.withOpacity(0.5),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  icon: Icon(
+                    FavoritesService().isFolderFavorite(folder.path)
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    color: FavoritesService().isFolderFavorite(folder.path)
+                        ? Colors.red
+                        : Colors.white.withOpacity(0.5),
+                  ),
+                  onPressed: () async {
+                    await FavoritesService().toggleFolderFavorite(
+                      folder.path,
+                      folder.mediaFiles,
+                    );
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            FavoritesService().isFolderFavorite(folder.path)
+                                ? 'Added ${folder.fileCount} songs to favorites'
+                                : 'Removed ${folder.fileCount} songs from favorites',
+                          ),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  },
+                ),
+                PopupMenuButton<String>(
+                  icon: Icon(
+                    Icons.more_vert,
+                    color: Colors.white.withOpacity(0.7),
+                  ),
+                  color: const Color(0xFF1E1E1E),
+                  onSelected: (value) {
+                    if (value == 'add_all_to_queue') {
+                      QueueService().addAllToQueue(folder.mediaFiles);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            'Added ${folder.fileCount} songs to queue',
+                          ),
+                          duration: const Duration(seconds: 2),
+                          backgroundColor: Colors.orange,
+                        ),
+                      );
+                    }
+                  },
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'add_all_to_queue',
+                      child: Row(
+                        children: [
+                          Icon(Icons.queue_music, color: Colors.white70),
+                          SizedBox(width: 12),
+                          Text(
+                            'Add all to queue',
+                            style: TextStyle(color: Colors.white),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                Icon(Icons.chevron_right, color: Colors.white.withOpacity(0.5)),
+              ],
             ),
             onTap: () => _openFolder(folder),
           ),
@@ -421,6 +501,110 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+            ),
+            trailing: PopupMenuButton<String>(
+              icon: Icon(Icons.more_vert, color: Colors.white.withOpacity(0.5)),
+              color: const Color(0xFF2a2a2a),
+              onSelected: (value) {
+                if (value == 'play_next') {
+                  QueueService().addNext(item);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('"${item.title}" will play next'),
+                      duration: const Duration(seconds: 2),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                } else if (value == 'add_to_queue') {
+                  QueueService().addToQueue(item);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Added "${item.title}" to queue'),
+                      duration: const Duration(seconds: 2),
+                      backgroundColor: Colors.orange,
+                      action: SnackBarAction(
+                        label: 'VIEW',
+                        textColor: Colors.white,
+                        onPressed: () {
+                          // Navigate to queue screen
+                          // This would need to be passed from parent
+                        },
+                      ),
+                    ),
+                  );
+                } else if (value == 'add_favorite') {
+                  FavoritesService().toggleFavorite(item);
+                  final isFavorite = FavoritesService().isFavorite(item.id);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        isFavorite
+                            ? 'Added to favorites'
+                            : 'Removed from favorites',
+                      ),
+                      duration: const Duration(seconds: 1),
+                      backgroundColor: Colors.orange,
+                    ),
+                  );
+                }
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'play_next',
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.skip_next,
+                        color: Colors.orange,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Play next',
+                        style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'add_to_queue',
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.queue_music,
+                        color: Colors.purple,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        'Add to queue',
+                        style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'add_favorite',
+                  child: Row(
+                    children: [
+                      Icon(
+                        FavoritesService().isFavorite(item.id)
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: Colors.red,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        FavoritesService().isFavorite(item.id)
+                            ? 'Remove from favorites'
+                            : 'Add to favorites',
+                        style: TextStyle(color: Colors.white.withOpacity(0.9)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             onTap: () => _playAudio(index),
           ),
@@ -646,6 +830,44 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                         fontSize: 14,
                       ),
                       textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    // Favorite button
+                    IconButton(
+                      icon: Icon(
+                        FavoritesService().isFavorite(
+                              _playlist[_currentIndex].id,
+                            )
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color:
+                            FavoritesService().isFavorite(
+                              _playlist[_currentIndex].id,
+                            )
+                            ? Colors.red
+                            : Colors.white.withOpacity(0.6),
+                        size: 32,
+                      ),
+                      onPressed: () async {
+                        await FavoritesService().toggleFavorite(
+                          _playlist[_currentIndex],
+                        );
+                        if (mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                FavoritesService().isFavorite(
+                                      _playlist[_currentIndex].id,
+                                    )
+                                    ? 'Added to favorites'
+                                    : 'Removed from favorites',
+                              ),
+                              duration: const Duration(seconds: 1),
+                              backgroundColor: Colors.orange,
+                            ),
+                          );
+                        }
+                      },
                     ),
                   ],
                 ),
