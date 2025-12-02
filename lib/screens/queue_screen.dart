@@ -36,6 +36,12 @@ class _QueueScreenState extends State<QueueScreen> {
   Widget build(BuildContext context) {
     final queue = _queueService.queue;
     final currentIndex = _queueService.currentIndex;
+    final audioQueue = queue
+        .where((item) => item.type == MediaType.audio)
+        .toList();
+    final videoQueue = queue
+        .where((item) => item.type == MediaType.video)
+        .toList();
 
     if (queue.isEmpty) {
       return SizedBox.expand(
@@ -127,7 +133,7 @@ class _QueueScreenState extends State<QueueScreen> {
                       ),
                     ),
                     Text(
-                      '${queue.length} ${queue.length == 1 ? "song" : "songs"}',
+                      '${queue.length} items (${audioQueue.length} music, ${videoQueue.length} videos)',
                       style: TextStyle(
                         color: Colors.white.withOpacity(0.6),
                         fontSize: 13,
@@ -139,22 +145,77 @@ class _QueueScreenState extends State<QueueScreen> {
             ],
           ),
         ),
-        // Queue list
+        // Queue list with sections
         Expanded(
-          child: ReorderableListView.builder(
+          child: ListView(
             padding: const EdgeInsets.all(16),
-            itemCount: queue.length,
-            onReorder: (oldIndex, newIndex) {
-              if (newIndex > oldIndex) {
-                newIndex--;
-              }
-              _queueService.moveItem(oldIndex, newIndex);
-            },
-            itemBuilder: (context, index) {
-              final item = queue[index];
-              final isCurrentlyPlaying = index == currentIndex;
-              return _buildQueueItem(item, index, isCurrentlyPlaying);
-            },
+            children: [
+              // Audio Section
+              if (audioQueue.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.music_note_rounded,
+                      color: Colors.orange,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Music (${audioQueue.length})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...queue
+                    .asMap()
+                    .entries
+                    .where((entry) => entry.value.type == MediaType.audio)
+                    .map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+                      final isCurrentlyPlaying = index == currentIndex;
+                      return _buildQueueItem(item, index, isCurrentlyPlaying);
+                    }),
+                const SizedBox(height: 24),
+              ],
+              // Video Section
+              if (videoQueue.isNotEmpty) ...[
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.videocam_rounded,
+                      color: Colors.blue,
+                      size: 24,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Videos (${videoQueue.length})',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                ...queue
+                    .asMap()
+                    .entries
+                    .where((entry) => entry.value.type == MediaType.video)
+                    .map((entry) {
+                      final index = entry.key;
+                      final item = entry.value;
+                      final isCurrentlyPlaying = index == currentIndex;
+                      return _buildQueueItem(item, index, isCurrentlyPlaying);
+                    }),
+              ],
+            ],
           ),
         ),
       ],

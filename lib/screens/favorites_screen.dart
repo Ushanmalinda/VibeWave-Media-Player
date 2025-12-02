@@ -35,6 +35,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   @override
   Widget build(BuildContext context) {
     final favorites = _favoritesService.favoriteItems;
+    final audioFavorites = favorites
+        .where((item) => item.type == MediaType.audio)
+        .toList();
+    final videoFavorites = favorites
+        .where((item) => item.type == MediaType.video)
+        .toList();
 
     if (favorites.isEmpty) {
       return SizedBox.expand(
@@ -90,13 +96,53 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       );
     }
 
-    return ListView.builder(
+    return ListView(
       padding: const EdgeInsets.all(16),
-      itemCount: favorites.length,
-      itemBuilder: (context, index) {
-        final item = favorites[index];
-        return _buildFavoriteItem(item);
-      },
+      children: [
+        // Audio Section
+        if (audioFavorites.isNotEmpty) ...[
+          Row(
+            children: [
+              const Icon(
+                Icons.music_note_rounded,
+                color: Colors.orange,
+                size: 28,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Music (${audioFavorites.length})',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...audioFavorites.map((item) => _buildFavoriteItem(item)),
+          const SizedBox(height: 24),
+        ],
+        // Video Section
+        if (videoFavorites.isNotEmpty) ...[
+          Row(
+            children: [
+              const Icon(Icons.videocam_rounded, color: Colors.blue, size: 28),
+              const SizedBox(width: 8),
+              Text(
+                'Videos (${videoFavorites.length})',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ...videoFavorites.map((item) => _buildFavoriteItem(item)),
+        ],
+      ],
     );
   }
 
