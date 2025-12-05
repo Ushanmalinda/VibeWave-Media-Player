@@ -10,6 +10,7 @@ import '../models/folder_item.dart';
 import '../services/media_scanner.dart';
 import '../services/thumbnail_service.dart';
 import '../services/favorites_service.dart';
+import '../services/bookmarks_service.dart';
 import '../services/queue_service.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
@@ -37,6 +38,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Timer? _positionUpdateTimer;
   FolderItem? _currentFolder;
   final FavoritesService _favoritesService = FavoritesService();
+  final BookmarksService _bookmarksService = BookmarksService();
   final QueueService _queueService = QueueService();
   final ValueNotifier<int> _fullscreenUpdateNotifier = ValueNotifier<int>(0);
 
@@ -45,6 +47,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     super.initState();
     _scanMediaFiles();
     _favoritesService.addListener(_onFavoritesChanged);
+    _bookmarksService.addListener(_onFavoritesChanged);
   }
 
   void _onFavoritesChanged() {
@@ -204,7 +207,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _backToFolders() {
+    // Pause and dispose video when going back to folders
+    _controller?.pause();
     setState(() {
+      _isPlaying = false;
       _isInFolderView = true;
       _currentFolder = null;
     });
@@ -328,29 +334,44 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          _buildHeader(),
-          if (_controller != null &&
-              _controller!.value.isInitialized &&
-              !_isInFolderView)
-            _buildVideoPlayer(),
-          Expanded(
-            child: _isLoading
-                ? _buildLoadingView()
-                : _isInFolderView
-                ? _buildFoldersView()
-                : _buildVideoListView(),
-          ),
-        ],
-      ),
-      floatingActionButton: !_isInFolderView
-          ? null
-          : FloatingActionButton(
-              onPressed: _scanMediaFiles,
-              child: const Icon(Icons.refresh),
+    return PopScope(
+      canPop: !_isInFolderView, // Allow pop only if not in folder view
+      onPopInvoked: (didPop) async {
+        if (!didPop && _isInFolderView) {
+          // This means we're in folder view and system wants to pop
+          // Just allow normal navigation back (exit app or go to previous screen)
+          return;
+        }
+        if (!didPop && !_isInFolderView) {
+          // We're in video list view, go back to folders instead of exiting
+          _backToFolders();
+        }
+      },
+      child: Scaffold(
+        body: Column(
+          children: [
+            _buildHeader(),
+            if (_controller != null &&
+                _controller!.value.isInitialized &&
+                !_isInFolderView)
+              _buildVideoPlayer(),
+            Expanded(
+              child: _isLoading
+                  ? _buildLoadingView()
+                  : _isInFolderView
+                  ? _buildFoldersView()
+                  : _buildVideoListView(),
             ),
+          ],
+        ),
+        floatingActionButton: !_isInFolderView
+            ? null
+            : FloatingActionButton(
+                heroTag: 'video_player_fab',
+                onPressed: _scanMediaFiles,
+                child: const Icon(Icons.refresh),
+              ),
+      ),
     );
   }
 
@@ -715,6 +736,43 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                             _favoritesService.toggleFavorite(
                               _videoList[_currentIndex],
                             );
+                          },
+                        ),
+                      if (_currentIndex >= 0 &&
+                          _currentIndex < _videoList.length)
+                        IconButton(
+                          icon: Icon(
+                            _bookmarksService.isBookmarked(
+                                  _videoList[_currentIndex].id,
+                                )
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            color:
+                                _bookmarksService.isBookmarked(
+                                  _videoList[_currentIndex].id,
+                                )
+                                ? Colors.orange
+                                : Colors.white,
+                          ),
+                          onPressed: () async {
+                            await _bookmarksService.toggleBookmark(
+                              _videoList[_currentIndex],
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    _bookmarksService.isBookmarked(
+                                          _videoList[_currentIndex].id,
+                                        )
+                                        ? 'Added to bookmarks'
+                                        : 'Removed from bookmarks',
+                                  ),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
                           },
                         ),
                       PopupMenuButton<String>(
@@ -1694,6 +1752,7 @@ class _FullscreenVideoPlayerState extends State<_FullscreenVideoPlayer> {
   Timer? _hideControlsTimer;
   Timer? _updateTimer;
   final FavoritesService _favoritesService = FavoritesService();
+  final BookmarksService _bookmarksService = BookmarksService();
 
   @override
   void initState() {
@@ -1701,6 +1760,7 @@ class _FullscreenVideoPlayerState extends State<_FullscreenVideoPlayer> {
     _startHideControlsTimer();
     _startUpdateTimer();
     _favoritesService.addListener(_onUpdate);
+    _bookmarksService.addListener(_onUpdate);
   }
 
   @override
@@ -1725,6 +1785,7 @@ class _FullscreenVideoPlayerState extends State<_FullscreenVideoPlayer> {
     _hideControlsTimer?.cancel();
     _updateTimer?.cancel();
     _favoritesService.removeListener(_onUpdate);
+    _bookmarksService.removeListener(_onUpdate);
     super.dispose();
   }
 
@@ -1882,6 +1943,20 @@ class _FullscreenVideoPlayerState extends State<_FullscreenVideoPlayer> {
                             ),
                             onPressed: () {
                               // Favorite toggle handled by parent
+                            },
+                          ),
+                          IconButton(
+                            icon: Icon(
+                              _bookmarksService.isBookmarked(widget.videoId)
+                                  ? Icons.bookmark
+                                  : Icons.bookmark_border,
+                              color:
+                                  _bookmarksService.isBookmarked(widget.videoId)
+                                  ? Colors.orange
+                                  : Colors.white,
+                            ),
+                            onPressed: () {
+                              // Bookmark toggle handled by parent
                             },
                           ),
                           PopupMenuButton<String>(

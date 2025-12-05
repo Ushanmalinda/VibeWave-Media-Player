@@ -6,8 +6,9 @@ import '../services/thumbnail_service.dart';
 
 class FavoritesScreen extends StatefulWidget {
   final Function(int)? onNavigate;
+  final String searchQuery;
 
-  const FavoritesScreen({super.key, this.onNavigate});
+  const FavoritesScreen({super.key, this.onNavigate, this.searchQuery = ''});
 
   @override
   State<FavoritesScreen> createState() => _FavoritesScreenState();
@@ -32,15 +33,70 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     setState(() {});
   }
 
+  void _showRemoveDialog(MediaItem item) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2a2a2a),
+        title: const Text(
+          'Remove from Favorites?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Remove "${item.title}" from favorites?',
+          style: TextStyle(color: Colors.white.withOpacity(0.8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white.withOpacity(0.6)),
+            ),
+          ),
+          TextButton(
+            onPressed: () async {
+              await _favoritesService.removeFavorite(item.id);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Removed "${item.title}" from favorites'),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<MediaItem> _getFilteredItems(List<MediaItem> items) {
+    if (widget.searchQuery.isEmpty) {
+      return items;
+    }
+    return items.where((item) {
+      final titleLower = item.title.toLowerCase();
+      final artistLower = (item.artist ?? '').toLowerCase();
+      final queryLower = widget.searchQuery.toLowerCase();
+      return titleLower.contains(queryLower) ||
+          artistLower.contains(queryLower);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final favorites = _favoritesService.favoriteItems;
-    final audioFavorites = favorites
-        .where((item) => item.type == MediaType.audio)
-        .toList();
-    final videoFavorites = favorites
-        .where((item) => item.type == MediaType.video)
-        .toList();
+    final audioFavorites = _getFilteredItems(
+      favorites.where((item) => item.type == MediaType.audio).toList(),
+    );
+    final videoFavorites = _getFilteredItems(
+      favorites.where((item) => item.type == MediaType.video).toList(),
+    );
 
     if (favorites.isEmpty) {
       return SizedBox.expand(
@@ -92,6 +148,31 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               ],
             ),
           ),
+        ),
+      );
+    }
+
+    if (audioFavorites.isEmpty &&
+        videoFavorites.isEmpty &&
+        widget.searchQuery.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 80,
+              color: Colors.white.withOpacity(0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No results found',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 18,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -151,6 +232,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       margin: const EdgeInsets.only(bottom: 12),
       color: const Color(0xFF2a2a2a),
       child: ListTile(
+        onLongPress: () => _showRemoveDialog(item),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         leading: _buildThumbnail(item),
         title: Text(

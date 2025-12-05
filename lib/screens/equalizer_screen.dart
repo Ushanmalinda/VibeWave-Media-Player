@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import '../models/equalizer_preset.dart';
+import '../services/audio_player_service.dart';
 
 class EqualizerScreen extends StatefulWidget {
   const EqualizerScreen({super.key});
@@ -12,6 +15,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   EqualizerPreset _currentPreset = EqualizerPreset.flat;
   Map<int, double> _customBands = Map.from(EqualizerPreset.flat.bands);
   bool _isEnabled = true;
+  bool _isLoading = true;
 
   final List<int> _frequencies = [
     32,
@@ -26,11 +30,88 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     16000,
   ];
 
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final isEnabled = prefs.getBool('eq_enabled') ?? true;
+      final presetName = prefs.getString('eq_preset') ?? 'Flat';
+      final bandsJson = prefs.getString('eq_bands');
+
+      setState(() {
+        _isEnabled = isEnabled;
+
+        // Find preset by name
+        final preset = EqualizerPreset.allPresets.firstWhere(
+          (p) => p.name == presetName,
+          orElse: () => EqualizerPreset.flat,
+        );
+        _currentPreset = preset;
+
+        // Load custom bands if available
+        if (bandsJson != null) {
+          final bandsMap = json.decode(bandsJson) as Map<String, dynamic>;
+          _customBands = bandsMap.map(
+            (key, value) => MapEntry(int.parse(key), value as double),
+          );
+        } else {
+          _customBands = Map.from(preset.bands);
+        }
+
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _saveSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('eq_enabled', _isEnabled);
+      await prefs.setString('eq_preset', _currentPreset.name);
+
+      // Save custom bands
+      final bandsMap = _customBands.map(
+        (key, value) => MapEntry(key.toString(), value),
+      );
+      await prefs.setString('eq_bands', json.encode(bandsMap));
+
+      // Apply to audio player
+      await AudioPlayerService().updateEqualizer();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${_currentPreset.name} preset applied'),
+            backgroundColor: Colors.green,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving settings: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
   void _applyPreset(EqualizerPreset preset) {
     setState(() {
       _currentPreset = preset;
       _customBands = Map.from(preset.bands);
     });
+    _saveSettings();
   }
 
   void _updateBand(int frequency, double value) {
@@ -49,6 +130,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
         _currentPreset = EqualizerPreset(name: 'Custom', bands: _customBands);
       }
     });
+    _saveSettings();
   }
 
   bool _bandsEqual(Map<int, double> a, Map<int, double> b) {
@@ -82,6 +164,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
             value: _isEnabled,
             onChanged: (value) {
               setState(() => _isEnabled = value);
+              _saveSettings();
             },
             activeColor: Colors.orange,
             activeTrackColor: Colors.orange.withOpacity(0.5),
@@ -91,6 +174,36 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
       ),
       body: Column(
         children: [
+          // Information Banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.green.withOpacity(0.3),
+                  Colors.green.withOpacity(0.1),
+                ],
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.music_note, color: Colors.green, size: 24),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Equalizer works for audio files only (not videos). Changes apply in real-time.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.9),
+                      height: 1.3,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Current Preset Display
           Container(
             width: double.infinity,

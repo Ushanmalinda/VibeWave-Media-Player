@@ -99,14 +99,10 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.music_note_rounded,
-                    size: 48,
-                    color: Colors.orange,
-                  ),
+                  Image.asset('assets/images/logo.png', width: 60, height: 60),
                   const SizedBox(height: 12),
                   const Text(
-                    'Welcome to Media Player',
+                    'Welcome to VibeWave Player',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 24,

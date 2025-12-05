@@ -6,8 +6,12 @@ import '../services/media_scanner.dart';
 import '../services/thumbnail_service.dart';
 import '../services/playback_manager.dart';
 import '../services/favorites_service.dart';
+import '../services/bookmarks_service.dart';
 import '../services/queue_service.dart';
 import '../services/audio_player_service.dart';
+import '../services/controls_manager.dart';
+import '../services/settings_service.dart';
+import 'package:volume_controller/volume_controller.dart';
 import 'dart:math';
 import 'dart:typed_data';
 
@@ -21,6 +25,9 @@ class AudioPlayerScreen extends StatefulWidget {
 class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   final AudioPlayer _audioPlayer = AudioPlayerService().player;
   final PlaybackManager _playbackManager = PlaybackManager();
+  final ControlsManager _controlsManager = ControlsManager();
+  final SettingsService _settings = SettingsService();
+  final VolumeController _volumeController = VolumeController();
   List<FolderItem> _folders = [];
   List<MediaItem> _playlist = [];
   int _currentIndex = -1;
@@ -33,6 +40,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   bool _isLoading = true;
   bool _isInFolderView = true;
   FolderItem? _currentFolder;
+  bool _isLoadingFromQueue = false;
+  double _currentVolume = 0.5;
 
   @override
   void initState() {
@@ -41,15 +50,75 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     _scanMediaFiles();
     FavoritesService().initialize();
     FavoritesService().addListener(_onFavoritesChanged);
+    BookmarksService().initialize();
+    BookmarksService().addListener(_onBookmarksChanged);
+    QueueService().addListener(_onQueueChanged);
+    _checkExistingQueue();
+    _initializeControls();
+  }
+
+  Future<void> _initializeControls() async {
+    await _controlsManager.initialize();
+    await _settings.initialize();
+    _currentVolume = await _volumeController.getVolume();
   }
 
   void _onFavoritesChanged() {
     setState(() {});
   }
 
+  void _onBookmarksChanged() {
+    setState(() {});
+  }
+
+  void _onQueueChanged() {
+    // When queue changes externally (e.g., from playlists), load and play it
+    // Skip if we're already processing a queue change to prevent infinite loop
+    if (_isLoadingFromQueue) return;
+
+    final queueService = QueueService();
+    // Check if queue actually changed by comparing lists
+    if (queueService.hasQueue &&
+        (queueService.queue.length != _playlist.length ||
+            queueService.currentIndex != _currentIndex)) {
+      _isLoadingFromQueue = true;
+
+      setState(() {
+        _playlist = List.from(queueService.queue);
+        _currentIndex = queueService.currentIndex;
+        _isInFolderView = false;
+      });
+
+      // Auto-play the selected item
+      if (_currentIndex >= 0 && _currentIndex < _playlist.length) {
+        _playAudioFromQueue(_currentIndex);
+      }
+
+      // Use a post-frame callback to reset the flag
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _isLoadingFromQueue = false;
+      });
+    }
+  }
+
+  void _checkExistingQueue() {
+    // Check if there's already a queue set (e.g., from playlists)
+    final queueService = QueueService();
+    if (queueService.hasQueue) {
+      setState(() {
+        _playlist = List.from(queueService.queue);
+        _currentIndex = queueService.currentIndex;
+        _isInFolderView = false;
+      });
+    }
+  }
+
   @override
   void dispose() {
     FavoritesService().removeListener(_onFavoritesChanged);
+    BookmarksService().removeListener(_onBookmarksChanged);
+    QueueService().removeListener(_onQueueChanged);
+    _controlsManager.dispose();
     // Don't dispose the singleton audio player
     super.dispose();
   }
@@ -119,6 +188,22 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     setState(() => _currentIndex = index);
     _playbackManager.updateCurrentlyPlaying(_playlist[index]);
     QueueService().setCurrentIndex(index);
+
+    try {
+      await _audioPlayer.setFilePath(_playlist[index].path);
+      await _audioPlayer.play();
+    } catch (e) {
+      _showError('Error playing audio: $e');
+    }
+  }
+
+  Future<void> _playAudioFromQueue(int index) async {
+    // Play audio without updating QueueService (to avoid triggering listener)
+    if (index < 0 || index >= _playlist.length) return;
+
+    setState(() => _currentIndex = index);
+    _playbackManager.updateCurrentlyPlaying(_playlist[index]);
+    // Don't call QueueService().setCurrentIndex() here
 
     try {
       await _audioPlayer.setFilePath(_playlist[index].path);
@@ -229,6 +314,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       floatingActionButton: !_isInFolderView
           ? null
           : FloatingActionButton(
+              heroTag: 'audio_player_fab',
               onPressed: _scanMediaFiles,
               child: const Icon(Icons.refresh),
             ),
@@ -717,6 +803,41 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                         ),
                         onPressed: _playNext,
                       ),
+                      IconButton(
+                        icon: Icon(
+                          BookmarksService().isBookmarked(
+                                _playlist[_currentIndex].id,
+                              )
+                              ? Icons.bookmark
+                              : Icons.bookmark_border,
+                          color:
+                              BookmarksService().isBookmarked(
+                                _playlist[_currentIndex].id,
+                              )
+                              ? Colors.orange
+                              : Colors.white.withOpacity(0.6),
+                        ),
+                        onPressed: () async {
+                          await BookmarksService().toggleBookmark(
+                            _playlist[_currentIndex],
+                          );
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  BookmarksService().isBookmarked(
+                                        _playlist[_currentIndex].id,
+                                      )
+                                      ? 'Added to bookmarks'
+                                      : 'Removed from bookmarks',
+                                ),
+                                duration: const Duration(seconds: 1),
+                                backgroundColor: Colors.orange,
+                              ),
+                            );
+                          }
+                        },
+                      ),
                     ],
                   ),
                 ),
@@ -764,15 +885,90 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Large album art
+              // Large album art with gesture controls
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 32),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: AudioThumbnail(
-                    audioPath: _playlist[_currentIndex].path,
-                    size: 320,
-                    showPlayIcon: false,
+                child: GestureDetector(
+                  onHorizontalDragEnd: (details) async {
+                    if (!_settings.gesturesEnabled) return;
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity > 500) {
+                      // Swipe left to right
+                      await _controlsManager.executeGestureAction(
+                        _settings.swipeLeftToRight,
+                      );
+                    } else if (velocity < -500) {
+                      // Swipe right to left
+                      await _controlsManager.executeGestureAction(
+                        _settings.swipeRightToLeft,
+                      );
+                    }
+                  },
+                  onVerticalDragUpdate: (details) {
+                    if (!_settings.gesturesEnabled) return;
+
+                    // Always control volume on vertical drag
+                    // Negative delta = swipe up = increase volume
+                    // Positive delta = swipe down = decrease volume
+                    final delta =
+                        -details.delta.dy / 300; // Normalize the drag distance
+                    final newVolume = (_currentVolume + delta).clamp(0.0, 1.0);
+
+                    _volumeController.setVolume(newVolume);
+                    setState(() {
+                      _currentVolume = newVolume;
+                    });
+                  },
+                  onVerticalDragEnd: (details) async {
+                    if (!_settings.gesturesEnabled) return;
+
+                    // Execute custom actions only if scrollVertically is NOT set to volume
+                    if (_settings.scrollVertically == 'volume') return;
+
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity > 500) {
+                      // Swipe top to bottom - fast swipe
+                      await _controlsManager.executeGestureAction(
+                        _settings.swipeTopToBottom,
+                      );
+                    } else if (velocity < -500) {
+                      // Swipe bottom to top - fast swipe
+                      await _controlsManager.executeGestureAction(
+                        _settings.swipeBottomToTop,
+                      );
+                    }
+                  },
+                  onDoubleTapDown: (details) async {
+                    if (!_settings.gesturesEnabled) return;
+                    final size = MediaQuery.of(context).size;
+                    final tapX = details.localPosition.dx;
+                    final albumArtSize = size.width - 64;
+
+                    // Determine tap location (left, center, right)
+                    if (tapX < albumArtSize / 3) {
+                      // Left side
+                      await _controlsManager.executeGestureAction(
+                        _settings.doubleTapLeft,
+                      );
+                    } else if (tapX > 2 * albumArtSize / 3) {
+                      // Right side
+                      await _controlsManager.executeGestureAction(
+                        _settings.doubleTapRight,
+                      );
+                    } else {
+                      // Center
+                      await _controlsManager.executeGestureAction(
+                        _settings.doubleTapCenter,
+                      );
+                    }
+                  },
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: AudioThumbnail(
+                      audioPath: _playlist[_currentIndex].path,
+                      size: 320,
+                      showPlayIcon: false,
+                    ),
                   ),
                 ),
               ),
@@ -832,42 +1028,86 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 16),
-                    // Favorite button
-                    IconButton(
-                      icon: Icon(
-                        FavoritesService().isFavorite(
-                              _playlist[_currentIndex].id,
-                            )
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color:
+                    // Favorite and Bookmark buttons
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        // Favorite button
+                        IconButton(
+                          icon: Icon(
                             FavoritesService().isFavorite(
-                              _playlist[_currentIndex].id,
-                            )
-                            ? Colors.red
-                            : Colors.white.withOpacity(0.6),
-                        size: 32,
-                      ),
-                      onPressed: () async {
-                        await FavoritesService().toggleFavorite(
-                          _playlist[_currentIndex],
-                        );
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(
+                                  _playlist[_currentIndex].id,
+                                )
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            color:
                                 FavoritesService().isFavorite(
-                                      _playlist[_currentIndex].id,
-                                    )
-                                    ? 'Added to favorites'
-                                    : 'Removed from favorites',
-                              ),
-                              duration: const Duration(seconds: 1),
-                              backgroundColor: Colors.orange,
-                            ),
-                          );
-                        }
-                      },
+                                  _playlist[_currentIndex].id,
+                                )
+                                ? Colors.red
+                                : Colors.white.withOpacity(0.6),
+                            size: 32,
+                          ),
+                          onPressed: () async {
+                            await FavoritesService().toggleFavorite(
+                              _playlist[_currentIndex],
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    FavoritesService().isFavorite(
+                                          _playlist[_currentIndex].id,
+                                        )
+                                        ? 'Added to favorites'
+                                        : 'Removed from favorites',
+                                  ),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                        const SizedBox(width: 16),
+                        // Bookmark button
+                        IconButton(
+                          icon: Icon(
+                            BookmarksService().isBookmarked(
+                                  _playlist[_currentIndex].id,
+                                )
+                                ? Icons.bookmark
+                                : Icons.bookmark_border,
+                            color:
+                                BookmarksService().isBookmarked(
+                                  _playlist[_currentIndex].id,
+                                )
+                                ? Colors.orange
+                                : Colors.white.withOpacity(0.6),
+                            size: 32,
+                          ),
+                          onPressed: () async {
+                            await BookmarksService().toggleBookmark(
+                              _playlist[_currentIndex],
+                            );
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    BookmarksService().isBookmarked(
+                                          _playlist[_currentIndex].id,
+                                        )
+                                        ? 'Added to bookmarks'
+                                        : 'Removed from bookmarks',
+                                  ),
+                                  duration: const Duration(seconds: 1),
+                                  backgroundColor: Colors.orange,
+                                ),
+                              );
+                            }
+                          },
+                        ),
+                      ],
                     ),
                   ],
                 ),

@@ -34,7 +34,7 @@ class ThumbnailService {
       _audioThumbnailCache[audioPath] = null;
       return null;
     } catch (e) {
-      print('Error getting audio thumbnail: $e');
+      // Silently handle errors - some files may have corrupted metadata
       _audioThumbnailCache[audioPath] = null;
       return null;
     }
@@ -65,7 +65,7 @@ class ThumbnailService {
 
       return thumbnail;
     } catch (e) {
-      print('Error generating video thumbnail: $e');
+      // Silently handle errors - some files may have corrupted metadata
       return null;
     }
   }

@@ -6,8 +6,9 @@ import '../services/thumbnail_service.dart';
 
 class QueueScreen extends StatefulWidget {
   final Function(int)? onNavigate;
+  final String searchQuery;
 
-  const QueueScreen({super.key, this.onNavigate});
+  const QueueScreen({super.key, this.onNavigate, this.searchQuery = ''});
 
   @override
   State<QueueScreen> createState() => _QueueScreenState();
@@ -32,16 +33,71 @@ class _QueueScreenState extends State<QueueScreen> {
     setState(() {});
   }
 
+  void _showRemoveDialog(MediaItem item, int index) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF2a2a2a),
+        title: const Text(
+          'Remove from Queue?',
+          style: TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          'Remove "${item.title}" from queue?',
+          style: TextStyle(color: Colors.white.withOpacity(0.8)),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: Colors.white.withOpacity(0.6)),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              _queueService.removeFromQueue(index);
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Removed "${item.title}" from queue'),
+                    duration: const Duration(seconds: 2),
+                    backgroundColor: Colors.orange,
+                  ),
+                );
+              }
+            },
+            child: const Text('Remove', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  List<MediaItem> _getFilteredItems(List<MediaItem> items) {
+    if (widget.searchQuery.isEmpty) {
+      return items;
+    }
+    return items.where((item) {
+      final titleLower = item.title.toLowerCase();
+      final artistLower = (item.artist ?? '').toLowerCase();
+      final queryLower = widget.searchQuery.toLowerCase();
+      return titleLower.contains(queryLower) ||
+          artistLower.contains(queryLower);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final queue = _queueService.queue;
     final currentIndex = _queueService.currentIndex;
-    final audioQueue = queue
-        .where((item) => item.type == MediaType.audio)
-        .toList();
-    final videoQueue = queue
-        .where((item) => item.type == MediaType.video)
-        .toList();
+    final audioQueue = _getFilteredItems(
+      queue.where((item) => item.type == MediaType.audio).toList(),
+    );
+    final videoQueue = _getFilteredItems(
+      queue.where((item) => item.type == MediaType.video).toList(),
+    );
 
     if (queue.isEmpty) {
       return SizedBox.expand(
@@ -93,6 +149,31 @@ class _QueueScreenState extends State<QueueScreen> {
               ],
             ),
           ),
+        ),
+      );
+    }
+
+    if (audioQueue.isEmpty &&
+        videoQueue.isEmpty &&
+        widget.searchQuery.isNotEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.search_off,
+              size: 80,
+              color: Colors.white.withOpacity(0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'No results found',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.6),
+                fontSize: 18,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -230,6 +311,7 @@ class _QueueScreenState extends State<QueueScreen> {
           ? Colors.purple.withOpacity(0.2)
           : const Color(0xFF2a2a2a),
       child: ListTile(
+        onLongPress: () => _showRemoveDialog(item, index),
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         leading: Stack(
           alignment: Alignment.center,
