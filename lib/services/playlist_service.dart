@@ -30,7 +30,7 @@ class PlaylistService extends ChangeNotifier {
           .toList();
       notifyListeners();
     } catch (e) {
-      print('Error loading playlists: $e');
+      // Error loading playlists
     }
   }
 
@@ -42,7 +42,7 @@ class PlaylistService extends ChangeNotifier {
       );
       await prefs.setString('playlists', playlistsJson);
     } catch (e) {
-      print('Error saving playlists: $e');
+      // Error saving playlists
     }
   }
 

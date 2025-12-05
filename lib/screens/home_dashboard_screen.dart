@@ -24,7 +24,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     super.initState();
     _playbackManager.addListener(_onPlaybackChanged);
     _requestPermissionsEarly();
-    _loadMediaCounts();
+    // Delay loading counts to improve initial load speed
+    Future.delayed(const Duration(milliseconds: 300), _loadMediaCounts);
   }
 
   Future<void> _requestPermissionsEarly() async {
@@ -33,6 +34,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   }
 
   Future<void> _loadMediaCounts() async {
+    if (!mounted) return;
     try {
       final audioFolders = await MediaScanner.scanAudioFiles();
       final videoFolders = await MediaScanner.scanVideoFiles();
@@ -59,7 +61,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         });
       }
     } catch (e) {
-      print('Error loading media counts: $e');
+      // Error loading media counts
     }
   }
 

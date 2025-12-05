@@ -69,7 +69,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
         _queueService.setCurrentIndex(currentIndex + 1);
         _playbackManager.updateCurrentlyPlaying(nextItem);
       } catch (e) {
-        print('Error playing next: $e');
+        // Error playing next track
       }
     }
   }
@@ -86,7 +86,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
         _queueService.setCurrentIndex(currentIndex - 1);
         _playbackManager.updateCurrentlyPlaying(previousItem);
       } catch (e) {
-        print('Error playing previous: $e');
+        // Error playing previous track
       }
     }
   }

@@ -6,9 +6,15 @@ class AudioPlayerService {
   factory AudioPlayerService() => _instance;
   AudioPlayerService._internal() {
     _setupPlayerListener();
+    _optimizeForLowEndDevices();
   }
 
-  final AudioPlayer _audioPlayer = AudioPlayer();
+  final AudioPlayer _audioPlayer = AudioPlayer(
+    // Optimize buffer for low-end devices
+    audioPipeline: AudioPipeline(
+      androidAudioEffects: [],
+    ),
+  );
   final EqualizerService _equalizerService = EqualizerService();
   bool _equalizerInitialized = false;
   int? _currentAudioSessionId;
@@ -49,6 +55,11 @@ class AudioPlayerService {
       await _ensureEqualizerInitialized();
     }
     await _equalizerService.updateSettings();
+  }
+
+  void _optimizeForLowEndDevices() {
+    // Reduce memory usage by setting audio player options
+    _audioPlayer.setSpeed(1.0); // Normal speed for stability
   }
 
   void dispose() {

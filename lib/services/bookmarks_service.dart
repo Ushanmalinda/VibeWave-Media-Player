@@ -29,7 +29,7 @@ class BookmarksService extends ChangeNotifier {
           .toList();
       notifyListeners();
     } catch (e) {
-      print('Error loading bookmarks: $e');
+      // Error loading bookmarks
     }
   }
 
@@ -41,7 +41,7 @@ class BookmarksService extends ChangeNotifier {
       );
       await prefs.setString('bookmarks', bookmarksJson);
     } catch (e) {
-      print('Error saving bookmarks: $e');
+      // Error saving bookmarks
     }
   }
 

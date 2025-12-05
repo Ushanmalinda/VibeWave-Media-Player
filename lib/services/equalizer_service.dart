@@ -35,23 +35,16 @@ class EqualizerService {
         );
       }
     } catch (e) {
-      print('Error loading equalizer settings: $e');
+      // Error loading equalizer settings
     }
   }
 
   Future<void> _applyEqualizerSettings() async {
     if (!Platform.isAndroid || _audioSessionId == null) {
-      print(
-        'Equalizer: Skipping - Platform: ${Platform.isAndroid}, Session ID: $_audioSessionId',
-      );
       return;
     }
 
     try {
-      print(
-        'Equalizer: Applying settings - Enabled: $_isEnabled, Bands: ${_bands.length}',
-      );
-
       await platform.invokeMethod('setEnabled', {'enabled': _isEnabled});
 
       if (_isEnabled && _bands.isNotEmpty) {
@@ -60,19 +53,13 @@ class EqualizerService {
             .map((e) => {'frequency': e.key, 'gain': e.value})
             .toList();
 
-        print(
-          'Equalizer: Sending to native - Session: $_audioSessionId, Bands: $bandsList',
-        );
-
         await platform.invokeMethod('setBands', {
           'audioSessionId': _audioSessionId,
           'bands': bandsList,
         });
-
-        print('Equalizer: Successfully applied');
       }
     } catch (e) {
-      print('Error applying equalizer: $e');
+      // Error applying equalizer
     }
   }
 
@@ -86,7 +73,7 @@ class EqualizerService {
       try {
         platform.invokeMethod('release');
       } catch (e) {
-        print('Error releasing equalizer: $e');
+        // Error releasing equalizer
       }
     }
   }
