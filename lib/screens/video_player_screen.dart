@@ -32,8 +32,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isFullScreen = false;
   bool _isLocked = false;
   double _playbackSpeed = 1.0;
-  double _currentBrightness = 0.5;
-  double _currentVolume = 0.5;
   Timer? _hideControlsTimer;
   Timer? _positionUpdateTimer;
   FolderItem? _currentFolder;

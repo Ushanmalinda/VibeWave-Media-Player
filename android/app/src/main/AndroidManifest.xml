@@ -18,22 +18,15 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         
-        <!-- Audio Service -->
-        <service
-            android:name="com.ryanheise.audioservice.AudioService"
-            android:foregroundServiceType="mediaPlayback"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.media.browse.MediaBrowserService" />
-            </intent-filter>
-        </service>
-        
-        <!-- Media button receiver -->
+        <!-- Media button receiver for lock screen controls -->
         <receiver 
-            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:name=".MediaButtonReceiver"
             android:exported="true">
             <intent-filter>
-                <action android:name="android.intent.action.MEDIA_BUTTON" />
+                <action android:name="com.vibewave.player.PLAY" />
+                <action android:name="com.vibewave.player.PAUSE" />
+                <action android:name="com.vibewave.player.NEXT" />
+                <action android:name="com.vibewave.player.PREVIOUS" />
             </intent-filter>
         </receiver>
         
@@ -74,6 +67,20 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- For opening web links -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+        <!-- For opening email links -->
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
         </intent>
     </queries>
 </manifest>

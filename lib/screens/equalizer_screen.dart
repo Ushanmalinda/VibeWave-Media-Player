@@ -15,7 +15,6 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
   EqualizerPreset _currentPreset = EqualizerPreset.flat;
   Map<int, double> _customBands = Map.from(EqualizerPreset.flat.bands);
   bool _isEnabled = true;
-  bool _isLoading = true;
 
   final List<int> _frequencies = [
     32,
@@ -62,11 +61,9 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
         } else {
           _customBands = Map.from(preset.bands);
         }
-
-        _isLoading = false;
       });
     } catch (e) {
-      setState(() => _isLoading = false);
+      // Error loading settings
     }
   }
 

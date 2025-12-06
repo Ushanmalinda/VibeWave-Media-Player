@@ -11,6 +11,7 @@ import '../services/queue_service.dart';
 import '../services/audio_player_service.dart';
 import '../services/controls_manager.dart';
 import '../services/settings_service.dart';
+import '../services/media_controls_service.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'dart:math';
 import 'dart:typed_data';
@@ -55,6 +56,15 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     QueueService().addListener(_onQueueChanged);
     _checkExistingQueue();
     _initializeControls();
+    _setupMediaControls();
+  }
+
+  void _setupMediaControls() {
+    MediaControlsService.setupMediaControls(
+      player: _audioPlayer,
+      onNext: _playNext,
+      onPrevious: _playPrevious,
+    );
   }
 
   Future<void> _initializeControls() async {
@@ -197,6 +207,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     try {
       await _audioPlayer.setFilePath(_playlist[index].path);
       await _audioPlayer.play();
+
+      // Update lock screen media controls
+      final media = _playlist[index];
+      MediaControlsService.updateMetadata(
+        title: media.title,
+        artist: media.artist,
+        album: media.album,
+      );
     } catch (e) {
       _showError('Error playing audio: $e');
     }
@@ -213,6 +231,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     try {
       await _audioPlayer.setFilePath(_playlist[index].path);
       await _audioPlayer.play();
+
+      // Update lock screen media controls
+      final media = _playlist[index];
+      MediaControlsService.updateMetadata(
+        title: media.title,
+        artist: media.artist,
+        album: media.album,
+      );
     } catch (e) {
       _showError('Error playing audio: $e');
     }

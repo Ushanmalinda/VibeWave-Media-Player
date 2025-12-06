@@ -265,32 +265,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
 
         const SizedBox(height: 32),
-
-        // Reset Settings Button
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: ElevatedButton.icon(
-            onPressed: () => _showResetDialog(context),
-            icon: const Icon(Icons.restore, color: Colors.white),
-            label: const Text(
-              'Reset All Settings to Default',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red.withOpacity(0.8),
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-        ),
-
-        const SizedBox(height: 32),
       ],
     );
   }
@@ -433,50 +407,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
       default:
         return action;
     }
-  }
-
-  void _showResetDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: const Color(0xFF2a2a2a),
-        title: const Text(
-          'Reset Settings',
-          style: TextStyle(color: Colors.white),
-        ),
-        content: const Text(
-          'Are you sure you want to reset all settings to default values? This action cannot be undone.',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text(
-              'Cancel',
-              style: TextStyle(color: Colors.white70),
-            ),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _settingsService.resetToDefaults();
-              if (context.mounted) {
-                // Refresh the UI to reflect the reset values
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('All settings have been reset to default'),
-                    backgroundColor: Colors.orange,
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('Reset', style: TextStyle(color: Colors.white)),
-          ),
-        ],
-      ),
-    );
   }
 }

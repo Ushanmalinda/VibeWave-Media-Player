@@ -1,10 +1,12 @@
 import 'package:just_audio/just_audio.dart';
+import 'package:audio_session/audio_session.dart';
 import 'equalizer_service.dart';
 
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
   AudioPlayerService._internal() {
+    _setupAudioSession();
     _setupPlayerListener();
     _optimizeForLowEndDevices();
   }
@@ -18,6 +20,52 @@ class AudioPlayerService {
   int? _currentAudioSessionId;
 
   AudioPlayer get player => _audioPlayer;
+
+  Future<void> _setupAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+
+      // Handle audio focus and interruptions
+      session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              // Lower volume
+              _audioPlayer.setVolume(0.5);
+              break;
+            case AudioInterruptionType.pause:
+            case AudioInterruptionType.unknown:
+              // Pause playback
+              _audioPlayer.pause();
+              break;
+          }
+        } else {
+          // Resume after interruption
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              // Restore volume
+              _audioPlayer.setVolume(1.0);
+              break;
+            case AudioInterruptionType.pause:
+              // Resume playback
+              _audioPlayer.play();
+              break;
+            case AudioInterruptionType.unknown:
+              // Do nothing
+              break;
+          }
+        }
+      });
+
+      // Handle becoming noisy (headphones unplugged)
+      session.becomingNoisyEventStream.listen((_) {
+        _audioPlayer.pause();
+      });
+    } catch (e) {
+      // Audio session setup failed, continue anyway
+    }
+  }
 
   void _setupPlayerListener() {
     // Listen to player state changes
