@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'home_dashboard_screen.dart';
 import 'audio_player_screen.dart';
 import 'video_player_screen.dart';
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isSearching = false;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+  DateTime? _lastBackPressed;
 
   // Keep all screens alive to maintain playback state
   List<Widget> get _screens => [
@@ -270,12 +272,53 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: _selectedDrawerIndex == 0,
-      onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _selectedDrawerIndex != 0) {
-          setState(() {
-            _selectedDrawerIndex = 0;
-          });
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (!didPop) {
+          if (_selectedDrawerIndex != 0) {
+            // If not on home dashboard, go back to home
+            setState(() {
+              _selectedDrawerIndex = 0;
+            });
+          } else {
+            // If on home dashboard, check for double back press to minimize
+            final now = DateTime.now();
+            final backButtonHasNotBeenPressedOrSnackBarHasBeenClosed =
+                _lastBackPressed == null ||
+                now.difference(_lastBackPressed!) > const Duration(seconds: 2);
+
+            if (backButtonHasNotBeenPressedOrSnackBarHasBeenClosed) {
+              _lastBackPressed = now;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'Press back again to minimize app',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  duration: const Duration(seconds: 2),
+                  backgroundColor: Colors.grey[850],
+                  behavior: SnackBarBehavior.floating,
+                  margin: const EdgeInsets.all(16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            } else {
+              // Double back press detected - minimize app
+              const platform = MethodChannel('android/back/pressed');
+              try {
+                await platform.invokeMethod('moveTaskToBack');
+              } catch (e) {
+                // Fallback
+                SystemNavigator.pop();
+              }
+            }
+          }
         }
       },
       child: Scaffold(

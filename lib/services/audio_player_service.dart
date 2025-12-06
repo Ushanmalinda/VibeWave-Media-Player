@@ -11,9 +11,7 @@ class AudioPlayerService {
 
   final AudioPlayer _audioPlayer = AudioPlayer(
     // Optimize buffer for low-end devices
-    audioPipeline: AudioPipeline(
-      androidAudioEffects: [],
-    ),
+    audioPipeline: AudioPipeline(androidAudioEffects: []),
   );
   final EqualizerService _equalizerService = EqualizerService();
   bool _equalizerInitialized = false;

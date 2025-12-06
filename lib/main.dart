@@ -1,16 +1,34 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'screens/home_screen.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Optimize for low-end devices
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-  ]);
-  
+  SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+  // Request permissions before app starts
+  await _requestPermissions();
+
   runApp(const MyApp());
+}
+
+Future<void> _requestPermissions() async {
+  // Request only necessary media permissions
+  Map<Permission, PermissionStatus> statuses = await [
+    Permission.audio,
+    Permission.videos,
+  ].request();
+
+  // Check if all permissions are granted
+  bool allGranted = statuses.values.every((status) => status.isGranted);
+
+  // If any permission is denied, close the app
+  if (!allGranted) {
+    SystemNavigator.pop(); // Close the app
+  }
 }
 
 class MyApp extends StatelessWidget {

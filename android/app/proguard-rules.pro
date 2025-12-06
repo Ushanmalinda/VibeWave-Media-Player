@@ -12,11 +12,19 @@
 -keep class io.flutter.view.** { *; }
 -keep class io.flutter.embedding.** { *; }
 
+# Keep Play Core (Fix for R8 errors)
+-keep class com.google.android.play.core.** { *; }
+-dontwarn com.google.android.play.core.**
+
 # Keep just_audio
 -keep class com.ryanheise.just_audio.** { *; }
 
 # Keep video_player
 -keep class io.flutter.plugins.videoplayer.** { *; }
+
+# Keep video_thumbnail
+-keep class xyz.justsoft.video_thumbnail.** { *; }
+-dontwarn xyz.justsoft.video_thumbnail.**
 
 # Optimize unused code
 -assumenosideeffects class android.util.Log {

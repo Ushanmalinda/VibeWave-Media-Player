@@ -171,8 +171,13 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       _isInFolderView = false;
       _currentIndex = -1;
     });
-    // Update queue service
+    // Update queue service without triggering auto-play
+    _isLoadingFromQueue = true; // Prevent auto-play when opening folder
     QueueService().setQueue(folder.mediaFiles);
+    // Reset flag after a brief delay
+    Future.delayed(const Duration(milliseconds: 100), () {
+      _isLoadingFromQueue = false;
+    });
   }
 
   void _backToFolders() {

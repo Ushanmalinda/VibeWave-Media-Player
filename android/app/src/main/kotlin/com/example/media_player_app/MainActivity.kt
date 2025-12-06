@@ -12,11 +12,23 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private val STORAGE_CHANNEL = "com.example.media_player_app/storage"
     private val EQUALIZER_CHANNEL = "com.media_player_app/equalizer"
+    private val BACK_CHANNEL = "android/back/pressed"
     private var equalizer: Equalizer? = null
     private var currentAudioSessionId: Int? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        
+        // Back button channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, BACK_CHANNEL).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "moveTaskToBack" -> {
+                    moveTaskToBack(true)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
         
         // Storage channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, STORAGE_CHANNEL).setMethodCallHandler { call, result ->
