@@ -32,6 +32,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isFullScreen = false;
   bool _isLocked = false;
   double _playbackSpeed = 1.0;
+  String _aspectRatioMode = 'Original'; // Original, Fill, 16:9, 4:3, 21:9
   Timer? _hideControlsTimer;
   Timer? _positionUpdateTimer;
   FolderItem? _currentFolder;
@@ -178,6 +179,106 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     final newPosition = currentPosition - const Duration(seconds: 10);
     _controller?.seekTo(
       newPosition < Duration.zero ? Duration.zero : newPosition,
+    );
+  }
+
+  void _cycleAspectRatio() {
+    final modes = ['Original', 'Fill', '16:9', '4:3', '21:9'];
+    final currentIndex = modes.indexOf(_aspectRatioMode);
+    final nextIndex = (currentIndex + 1) % modes.length;
+    setState(() => _aspectRatioMode = modes[nextIndex]);
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Container(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+          child: Text(
+            'Aspect Ratio: $_aspectRatioMode',
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
+          ),
+        ),
+        duration: const Duration(milliseconds: 1500),
+        backgroundColor: Colors.black.withOpacity(0.85),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(
+          bottom: MediaQuery.of(context).size.height * 0.42,
+          left: MediaQuery.of(context).size.width * 0.25,
+          right: MediaQuery.of(context).size.width * 0.25,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        elevation: 8,
+      ),
+    );
+  }
+
+  Widget _buildVideoWithAspectRatio() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final screenWidth = constraints.maxWidth;
+        final screenHeight = constraints.maxHeight;
+        final screenAspectRatio = screenWidth / screenHeight;
+        final videoAspectRatio = _controller!.value.aspectRatio;
+
+        double videoWidth;
+        double videoHeight;
+
+        if (_aspectRatioMode == 'Fill') {
+          // Fill mode - cover entire screen
+          if (screenAspectRatio > videoAspectRatio) {
+            videoWidth = screenWidth;
+            videoHeight = screenWidth / videoAspectRatio;
+          } else {
+            videoHeight = screenHeight;
+            videoWidth = screenHeight * videoAspectRatio;
+          }
+        } else if (_aspectRatioMode == 'Original') {
+          // Original mode - fit video maintaining aspect ratio
+          if (screenAspectRatio > videoAspectRatio) {
+            videoHeight = screenHeight;
+            videoWidth = screenHeight * videoAspectRatio;
+          } else {
+            videoWidth = screenWidth;
+            videoHeight = screenWidth / videoAspectRatio;
+          }
+        } else {
+          // Custom aspect ratios
+          double targetAspectRatio;
+          switch (_aspectRatioMode) {
+            case '16:9':
+              targetAspectRatio = 16 / 9;
+              break;
+            case '4:3':
+              targetAspectRatio = 4 / 3;
+              break;
+            case '21:9':
+              targetAspectRatio = 21 / 9;
+              break;
+            default:
+              targetAspectRatio = videoAspectRatio;
+          }
+
+          if (screenAspectRatio > targetAspectRatio) {
+            videoHeight = screenHeight;
+            videoWidth = screenHeight * targetAspectRatio;
+          } else {
+            videoWidth = screenWidth;
+            videoHeight = screenWidth / targetAspectRatio;
+          }
+        }
+
+        return Center(
+          child: SizedBox(
+            width: videoWidth,
+            height: videoHeight,
+            child: VideoPlayer(_controller!),
+          ),
+        );
+      },
     );
   }
 
@@ -580,16 +681,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       height: MediaQuery.of(context).size.height,
       color: Colors.black,
       child: Stack(
-        alignment: Alignment.center,
+        fit: StackFit.expand,
         children: [
-          Center(
-            child: RepaintBoundary(
-              child: AspectRatio(
-                aspectRatio: _controller!.value.aspectRatio,
-                child: VideoPlayer(_controller!),
-              ),
-            ),
-          ),
+          RepaintBoundary(child: _buildVideoWithAspectRatio()),
           _buildPlayerControls(isFullscreen: true),
         ],
       ),
@@ -615,16 +709,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         height: 300,
         color: Colors.black,
         child: Stack(
-          alignment: Alignment.center,
+          fit: StackFit.expand,
           children: [
-            Center(
-              child: RepaintBoundary(
-                child: AspectRatio(
-                  aspectRatio: _controller!.value.aspectRatio,
-                  child: VideoPlayer(_controller!),
-                ),
-              ),
-            ),
+            RepaintBoundary(child: _buildVideoWithAspectRatio()),
             _buildPlayerControls(isFullscreen: false),
           ],
         ),
@@ -636,35 +723,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Lock button (always visible)
-        if (!_isLocked)
-          Positioned(
-            top: 16,
-            left: 16,
-            child: AnimatedOpacity(
-              opacity: _showControls ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: IconButton(
-                icon: const Icon(
-                  Icons.lock_open,
-                  color: Colors.white,
-                  size: 28,
-                ),
-                onPressed: () => setState(() => _isLocked = true),
-              ),
-            ),
-          ),
-
-        if (_isLocked)
-          Positioned(
-            top: 16,
-            left: 16,
-            child: IconButton(
-              icon: const Icon(Icons.lock, color: Colors.orange, size: 28),
-              onPressed: () => setState(() => _isLocked = false),
-            ),
-          ),
-
         // Main controls (hidden when locked)
         if (_showControls && !_isLocked)
           Container(
@@ -938,6 +996,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                           ),
                           Row(
                             children: [
+                              // Aspect ratio button
+                              IconButton(
+                                icon: const Icon(
+                                  Icons.aspect_ratio,
+                                  color: Colors.white,
+                                ),
+                                onPressed: _cycleAspectRatio,
+                                tooltip: _aspectRatioMode,
+                              ),
+                              // Fullscreen button
                               IconButton(
                                 icon: Icon(
                                   isFullscreen
@@ -955,6 +1023,54 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   ],
                 ),
               ],
+            ),
+          ),
+
+        // Lock button - visible when controls are shown or when locked
+        if (_showControls && !_isLocked)
+          Positioned(
+            top: 60,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(
+                  Icons.lock_open,
+                  color: Colors.white,
+                  size: 28,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isLocked = true;
+                    _showControls = false;
+                  });
+                },
+              ),
+            ),
+          ),
+
+        if (_isLocked)
+          Positioned(
+            top: 60,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.7),
+                shape: BoxShape.circle,
+              ),
+              child: IconButton(
+                icon: const Icon(Icons.lock, color: Colors.orange, size: 28),
+                onPressed: () {
+                  setState(() {
+                    _isLocked = false;
+                    _showControls = true;
+                  });
+                  _startHideControlsTimer();
+                },
+              ),
             ),
           ),
       ],
@@ -1403,8 +1519,8 @@ class _FullScreenVideoWidgetState extends State<_FullScreenVideoWidget> {
             // Video player (bottom layer)
             widget.videoPlayerState._buildFullscreenPlayer(),
 
-            // Gesture detection layer (only active when controls are hidden)
-            if (!_localShowControls)
+            // Gesture detection layer (only active when controls are hidden and not locked)
+            if (!_localShowControls && !widget.videoPlayerState._isLocked)
               GestureDetector(
                 onHorizontalDragStart: (details) {
                   if (widget.videoPlayerState._controller != null &&
