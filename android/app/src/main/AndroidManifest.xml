@@ -27,6 +27,7 @@
                 <action android:name="com.vibewave.player.PAUSE" />
                 <action android:name="com.vibewave.player.NEXT" />
                 <action android:name="com.vibewave.player.PREVIOUS" />
+                    <action android:name="com.vibewave.player.CLOSE" />
             </intent-filter>
         </receiver>
         

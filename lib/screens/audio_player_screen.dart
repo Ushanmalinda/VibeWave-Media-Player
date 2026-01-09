@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import '../models/media_item.dart';
 import '../models/folder_item.dart';
@@ -12,6 +13,7 @@ import '../services/audio_player_service.dart';
 import '../services/controls_manager.dart';
 import '../services/settings_service.dart';
 import '../services/media_controls_service.dart';
+import '../services/last_played_service.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'dart:math';
 import 'dart:typed_data';
@@ -23,7 +25,8 @@ class AudioPlayerScreen extends StatefulWidget {
   State<AudioPlayerScreen> createState() => _AudioPlayerScreenState();
 }
 
-class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
+class _AudioPlayerScreenState extends State<AudioPlayerScreen>
+    with WidgetsBindingObserver {
   final AudioPlayer _audioPlayer = AudioPlayerService().player;
   final PlaybackManager _playbackManager = PlaybackManager();
   final ControlsManager _controlsManager = ControlsManager();
@@ -47,6 +50,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _setupAudioPlayer();
     _scanMediaFiles();
     FavoritesService().initialize();
@@ -57,14 +61,94 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     _checkExistingQueue();
     _initializeControls();
     _setupMediaControls();
+
+    // Load last played song
+    _loadLastPlayedSong();
+  }
+
+  Future<void> _loadLastPlayedSong() async {
+    final last = await LastPlayedService.loadLastPlayed();
+    if (last != null) {
+      try {
+        final item = MediaItem.fromJson(
+          Map<String, dynamic>.from(last['item']),
+        );
+        final index = last['index'] as int;
+        final playlistData = last['playlist'] as List<Map<String, dynamic>>?;
+
+        // Update PlaybackManager so MiniPlayer can show the last played song
+        _playbackManager.updateCurrentlyPlaying(item);
+
+        // Restore full playlist if available
+        List<MediaItem> playlist = [item];
+        int currentIndex = 0;
+
+        if (playlistData != null && playlistData.isNotEmpty) {
+          playlist = playlistData
+              .map((json) => MediaItem.fromJson(json))
+              .toList();
+          // Ensure index is within bounds
+          currentIndex = index < playlist.length ? index : 0;
+        }
+
+        setState(() {
+          _playlist = playlist;
+          _currentIndex = currentIndex;
+          _isInFolderView = false;
+        });
+
+        // Update QueueService so next/previous buttons work
+        QueueService().setQueue(playlist, startIndex: currentIndex);
+
+        // Load the audio file into the player so play button works
+        try {
+          await _audioPlayer.setFilePath(playlist[currentIndex].path);
+        } catch (e) {
+          // File might not exist anymore
+        }
+
+        // Update metadata for lock screen
+        MediaControlsService.updateMetadata(
+          title: item.title,
+          artist: item.artist,
+          album: item.album,
+          thumbnailPath: item.thumbnailPath,
+          playing: false,
+        );
+      } catch (e) {
+        // Error loading last played song
+      }
+    }
   }
 
   void _setupMediaControls() {
     MediaControlsService.setupMediaControls(
       player: _audioPlayer,
-      onNext: _playNext,
-      onPrevious: _playPrevious,
+      onNext: () {
+        _playNext();
+      },
+      onPrevious: () {
+        _playPrevious();
+      },
+      onClose: _closeApp,
+      onSeek: (position) async {
+        await _audioPlayer.seek(position);
+      },
     );
+  }
+
+  void _closeApp() {
+    // Stop playback
+    _audioPlayer.stop();
+    // Dispose media controls
+    MediaControlsService.dispose();
+    // Exit the app
+
+    // Save last played song
+    if (_currentIndex >= 0 && _currentIndex < _playlist.length) {
+      LastPlayedService.saveLastPlayed(_playlist[_currentIndex], _currentIndex);
+    }
+    SystemChannels.platform.invokeMethod('SystemNavigator.pop');
   }
 
   Future<void> _initializeControls() async {
@@ -125,6 +209,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _saveCurrentSong();
     FavoritesService().removeListener(_onFavoritesChanged);
     BookmarksService().removeListener(_onBookmarksChanged);
     QueueService().removeListener(_onQueueChanged);
@@ -133,12 +219,54 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) async {
+    super.didChangeAppLifecycleState(state);
+    print('Lifecycle state changed to: $state');
+
+    // Save when app goes to background or paused
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      _saveCurrentSong();
+    }
+
+    // Ensure shake detection is running when app becomes active
+    if (state == AppLifecycleState.resumed) {
+      // Just verify it's running, don't stop/restart
+      await _controlsManager.ensureShakeDetectionRunning();
+    }
+  }
+
+  void _saveCurrentSong() {
+    if (_currentIndex >= 0 && _currentIndex < _playlist.length) {
+      LastPlayedService.saveLastPlayed(
+        _playlist[_currentIndex],
+        _currentIndex,
+        _playlist,
+      );
+    }
+  }
+
   void _setupAudioPlayer() {
     _audioPlayer.durationStream.listen((duration) {
       setState(() {
         _duration = duration ?? Duration.zero;
       });
       _playbackManager.updateDuration(duration ?? Duration.zero);
+
+      // Update metadata with duration for lock screen timeline
+      if (_currentIndex >= 0 && _currentIndex < _playlist.length) {
+        final media = _playlist[_currentIndex];
+        MediaControlsService.updateMetadata(
+          title: media.title,
+          artist: media.artist,
+          album: media.album,
+          duration: duration,
+          thumbnailPath: media.thumbnailPath,
+          playing: _isPlaying,
+        );
+      }
     });
 
     _audioPlayer.positionStream.listen((position) {
@@ -152,6 +280,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
       setState(() {
         _isPlaying = state.playing;
       });
+
+      // Update wakelock for shake detection when screen is locked
+      _controlsManager.updateWakeLock(state.playing);
       _playbackManager.updatePlayingState(state.playing);
 
       if (state.processingState == ProcessingState.completed) {
@@ -160,14 +291,25 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     });
   }
 
-  Future<void> _scanMediaFiles() async {
+  Future<void> _scanMediaFiles({bool forceRescan = false}) async {
     setState(() => _isLoading = true);
     try {
-      final folders = await MediaScanner.scanAudioFiles();
+      final folders = await MediaScanner.scanAudioFiles(
+        forceRescan: forceRescan,
+      );
       setState(() {
         _folders = folders;
         _isLoading = false;
       });
+
+      if (forceRescan) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Media library refreshed'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('Error scanning files: $e');
@@ -205,16 +347,21 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     QueueService().setCurrentIndex(index);
 
     try {
-      await _audioPlayer.setFilePath(_playlist[index].path);
-      await _audioPlayer.play();
-
-      // Update lock screen media controls
+      // Update metadata BEFORE starting playback
       final media = _playlist[index];
       MediaControlsService.updateMetadata(
         title: media.title,
         artist: media.artist,
         album: media.album,
+        thumbnailPath: media.thumbnailPath,
+        playing: true,
       );
+
+      await _audioPlayer.setFilePath(_playlist[index].path);
+      await _audioPlayer.play();
+
+      // Save as last played song
+      LastPlayedService.saveLastPlayed(media, index, _playlist);
     } catch (e) {
       _showError('Error playing audio: $e');
     }
@@ -225,20 +372,25 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
     if (index < 0 || index >= _playlist.length) return;
 
     setState(() => _currentIndex = index);
+
+    // Save as last played song
+    LastPlayedService.saveLastPlayed(_playlist[index], index, _playlist);
     _playbackManager.updateCurrentlyPlaying(_playlist[index]);
     // Don't call QueueService().setCurrentIndex() here
 
     try {
-      await _audioPlayer.setFilePath(_playlist[index].path);
-      await _audioPlayer.play();
-
-      // Update lock screen media controls
+      // Update metadata BEFORE starting playback
       final media = _playlist[index];
       MediaControlsService.updateMetadata(
         title: media.title,
         artist: media.artist,
         album: media.album,
+        thumbnailPath: media.thumbnailPath,
+        playing: true,
       );
+
+      await _audioPlayer.setFilePath(_playlist[index].path);
+      await _audioPlayer.play();
     } catch (e) {
       _showError('Error playing audio: $e');
     }
@@ -381,6 +533,11 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen> {
             ),
           ),
           if (!_isInFolderView) ...[
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh library',
+              onPressed: () => _scanMediaFiles(forceRescan: true),
+            ),
             IconButton(
               icon: Icon(
                 _isShuffle ? Icons.shuffle_on_rounded : Icons.shuffle,

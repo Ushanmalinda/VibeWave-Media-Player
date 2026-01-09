@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+2002
+version: 1.0.0+2003
 
 environment:
   sdk: ^3.9.2
@@ -64,8 +64,14 @@ dependencies:
   video_thumbnail: ^0.5.3
   audiotags: ^1.0.1
   
+  # Crypto for hash generation
+  crypto: ^3.0.3
+  
   # Sensors for shake detection
   sensors_plus: ^6.0.1
+  
+  # Keep app awake for shake detection on lock screen
+  wakelock_plus: ^1.2.8
   
   # Audio session for headset controls
   audio_session: ^0.1.21

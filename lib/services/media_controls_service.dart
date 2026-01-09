@@ -8,6 +8,8 @@ class MediaControlsService {
     required AudioPlayer player,
     required Function() onNext,
     required Function() onPrevious,
+    required Function() onClose,
+    required Function(Duration) onSeek,
   }) async {
     // Listen to platform method calls
     platform.setMethodCallHandler((call) async {
@@ -23,6 +25,13 @@ class MediaControlsService {
           break;
         case 'previous':
           onPrevious();
+          break;
+        case 'close':
+          onClose();
+          break;
+        case 'seek':
+          final position = call.arguments['position'] as int;
+          onSeek(Duration(milliseconds: position));
           break;
       }
     });
@@ -42,6 +51,8 @@ class MediaControlsService {
     String? artist,
     String? album,
     Duration? duration,
+    String? thumbnailPath,
+    bool? playing,
   }) async {
     try {
       await platform.invokeMethod('updateMetadata', {
@@ -49,6 +60,8 @@ class MediaControlsService {
         'artist': artist ?? 'Unknown Artist',
         'album': album ?? 'Unknown Album',
         'duration': duration?.inMilliseconds ?? 0,
+        'thumbnailPath': thumbnailPath,
+        'playing': playing,
       });
     } catch (e) {
       // Silently handle errors

@@ -28,6 +28,10 @@ class MediaButtonReceiver : BroadcastReceiver() {
                 android.util.Log.d("MediaButtonReceiver", "Previous action received")
                 (context as? MainActivity)?.handleMediaAction("previous")
             }
+            "com.vibewave.player.CLOSE" -> {
+                android.util.Log.d("MediaButtonReceiver", "Close action received")
+                (context as? MainActivity)?.handleMediaAction("close")
+            }
         }
     }
 }

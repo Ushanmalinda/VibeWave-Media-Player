@@ -14,6 +14,9 @@ import '../services/favorites_service.dart';
 import '../services/queue_service.dart';
 import '../services/bookmarks_service.dart';
 import '../services/playlist_service.dart';
+import '../services/last_played_service.dart';
+import '../services/playback_manager.dart';
+import '../models/media_item.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -28,6 +31,28 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
   DateTime? _lastBackPressed;
+  final PlaybackManager _playbackManager = PlaybackManager();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLastPlayedSong();
+  }
+
+  Future<void> _loadLastPlayedSong() async {
+    final last = await LastPlayedService.loadLastPlayed();
+    if (last != null) {
+      try {
+        final item = MediaItem.fromJson(
+          Map<String, dynamic>.from(last['item']),
+        );
+        // Update PlaybackManager so MiniPlayer can show the last played song
+        _playbackManager.updateCurrentlyPlaying(item);
+      } catch (e) {
+        // Error loading last played song
+      }
+    }
+  }
 
   // Keep all screens alive to maintain playback state
   List<Widget> get _screens => [

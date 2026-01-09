@@ -6,6 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.ComponentName
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.audiofx.Equalizer
 import android.os.Build
@@ -13,6 +14,7 @@ import android.os.storage.StorageManager
 import android.os.storage.StorageVolume
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import android.support.v4.media.MediaMetadataCompat
 import androidx.core.app.NotificationCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -23,6 +25,7 @@ class MainActivity : FlutterActivity() {
     private val EQUALIZER_CHANNEL = "com.media_player_app/equalizer"
     private val BACK_CHANNEL = "android/back/pressed"
     private val MEDIA_CONTROLS_CHANNEL = "com.vibewave.player/media_controls"
+    private val SHAKE_CHANNEL = "com.vibewave.player/shake"
     private var equalizer: Equalizer? = null
     private var currentAudioSessionId: Int? = null
     private var mediaSession: MediaSessionCompat? = null
@@ -31,9 +34,14 @@ class MainActivity : FlutterActivity() {
     private val CHANNEL_ID = "media_playback_channel"
     private var currentTitle: String = "Unknown"
     private var currentArtist: String = "Unknown Artist"
+    private var currentThumbnailPath: String? = null
     private var isPlaying: Boolean = false
     private var mediaButtonReceiver: MediaButtonReceiver? = null
     private var flutterEngineRef: FlutterEngine? = null
+    private var currentDuration: Long = 0
+    private var shakeDetectionService: ShakeDetectionService? = null
+    private var currentPosition: Long = 0
+    // Removed isFavorite for standard controls
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -46,6 +54,30 @@ class MainActivity : FlutterActivity() {
         setupMediaSession(flutterEngine)
         registerMediaButtonReceiver()
         
+        // Initialize shake detection service
+        val shakeChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, SHAKE_CHANNEL)
+        shakeDetectionService = ShakeDetectionService(this, shakeChannel)
+        
+        // Shake detection channel
+        shakeChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start" -> {
+                    shakeDetectionService?.start()
+                    result.success(null)
+                }
+                "stop" -> {
+                    shakeDetectionService?.stop()
+                    result.success(null)
+                }
+                "setSensitivity" -> {
+                    val sensitivity = call.argument<Int>("sensitivity") ?: 3
+                    shakeDetectionService?.setSensitivity(sensitivity)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
+        
         // Media controls channel
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CONTROLS_CHANNEL).setMethodCallHandler { call, result ->
             when (call.method) {
@@ -53,16 +85,45 @@ class MainActivity : FlutterActivity() {
                     val title = call.argument<String>("title") ?: "Unknown"
                     val artist = call.argument<String>("artist") ?: "Unknown Artist"
                     val album = call.argument<String>("album") ?: "Unknown Album"
+                    val thumbnailPath = call.argument<String>("thumbnailPath")
+                    val playing = call.argument<Boolean>("playing")
+                    val duration = call.argument<Int>("duration") ?: 0
+                    
                     currentTitle = title
                     currentArtist = artist
-                    updateNotification(title, artist, isPlaying)
+                    currentThumbnailPath = thumbnailPath
+                    currentDuration = duration.toLong()
+                    
+                    // Update isPlaying if provided
+                    if (playing != null) {
+                        isPlaying = playing
+                    }
+                    
+                    // Ensure MediaSession is active
+                    if (mediaSession?.isActive != true) {
+                        mediaSession?.isActive = true
+                    }
+                    
+                    // Set playback state with position
+                    updatePlaybackState(isPlaying, currentPosition)
+                    
+                    // Update metadata and notification
+                    updateMediaSessionMetadata(title, artist, album, thumbnailPath, currentDuration)
+                    updateNotification(title, artist, isPlaying, thumbnailPath)
                     result.success(null)
                 }
+                // Removed toggleFavorite for standard controls
                 "updatePlaybackState" -> {
                     val playing = call.argument<Boolean>("playing") ?: false
                     isPlaying = playing
-                    updatePlaybackState(playing)
-                    updateNotification(currentTitle, currentArtist, playing)
+                    updatePlaybackState(playing, currentPosition)
+                    updateNotification(currentTitle, currentArtist, playing, currentThumbnailPath)
+                    result.success(null)
+                }
+                "updatePosition" -> {
+                    val position = call.argument<Int>("position") ?: 0
+                    currentPosition = position.toLong()
+                    updatePlaybackState(isPlaying, currentPosition)
                     result.success(null)
                 }
                 "dispose" -> {
@@ -172,11 +233,70 @@ class MainActivity : FlutterActivity() {
     }
 
     override fun onDestroy() {
+        android.util.Log.d("MainActivity", "onDestroy called - cleaning up")
+        
+        // Stop shake detection
+        shakeDetectionService?.stop()
+        
+        // Force stop any ongoing state
+        isPlaying = false
+        
+        // Pause playback
+        flutterEngineRef?.let { engine ->
+            try {
+                MethodChannel(engine.dartExecutor.binaryMessenger, MEDIA_CONTROLS_CHANNEL)
+                    .invokeMethod("pause", null)
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error pausing in onDestroy: ${e.message}")
+            }
+        }
+        
+        // Clean up equalizer
         equalizer?.release()
+        equalizer = null
+        
+        // Clean up media session BEFORE hiding notification
+        mediaSession?.isActive = false
         mediaSession?.release()
-        hideNotification()
+        mediaSession = null
+        
+        // Force cancel the notification
+        notificationManager?.cancel(NOTIFICATION_ID)
+        
+        // Clean up receiver
         unregisterMediaButtonReceiver()
+        
         super.onDestroy()
+    }
+    
+    override fun onStop() {
+        super.onStop()
+        android.util.Log.d("MainActivity", "onStop called")
+        // ...existing code...
+    }
+
+
+    
+    private fun cleanupOnTaskRemoval() {
+        // Force stop playback state
+        isPlaying = false
+
+        // Update playback state to stopped
+        val playbackState = PlaybackStateCompat.Builder()
+            .setState(PlaybackStateCompat.STATE_STOPPED, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+            .build()
+        mediaSession?.setPlaybackState(playbackState)
+
+        // Release media session and remove controls from lock screen
+        mediaSession?.isActive = false
+        mediaSession?.release()
+        mediaSession = null
+
+        // Cancel notification immediately and hide controls from notification panel
+        hideNotification()
+
+        // Optionally, stop the service if running (for background playback)
+        // stopSelf() // Uncomment if using a Service
     }
     
     private fun registerMediaButtonReceiver() {
@@ -186,6 +306,7 @@ class MainActivity : FlutterActivity() {
             addAction("com.vibewave.player.PAUSE")
             addAction("com.vibewave.player.NEXT")
             addAction("com.vibewave.player.PREVIOUS")
+            addAction("com.vibewave.player.CLOSE")
         }
         registerReceiver(mediaButtonReceiver, filter)
     }
@@ -199,10 +320,41 @@ class MainActivity : FlutterActivity() {
     }
     
     fun handleMediaAction(action: String) {
-        flutterEngineRef?.let { engine ->
-            android.util.Log.d("MainActivity", "Handling media action: $action")
-            MethodChannel(engine.dartExecutor.binaryMessenger, MEDIA_CONTROLS_CHANNEL)
-                .invokeMethod(action, null)
+        if (action == "close") {
+            // Handle close action - stop playback, dismiss notification, and exit app
+            android.util.Log.d("MainActivity", "Handling close action - exiting app")
+
+            // Pause playback first
+            flutterEngineRef?.let { engine ->
+                MethodChannel(engine.dartExecutor.binaryMessenger, MEDIA_CONTROLS_CHANNEL)
+                    .invokeMethod("pause", null)
+            }
+
+            // Hide notification (use both managers for reliability)
+            hideNotification()
+            try {
+                val compat = androidx.core.app.NotificationManagerCompat.from(this)
+                compat.cancel(NOTIFICATION_ID)
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "NotificationManagerCompat cancel failed: ${e.message}")
+            }
+
+            // Clean up media session
+            mediaSession?.isActive = false
+            mediaSession?.release()
+            mediaSession = null
+
+            // Add a short delay to ensure notification is removed before killing process
+            android.os.Handler(mainLooper).postDelayed({
+                finishAndRemoveTask()
+                System.exit(0)
+            }, 200)
+        } else {
+            flutterEngineRef?.let { engine ->
+                android.util.Log.d("MainActivity", "Handling media action: $action")
+                MethodChannel(engine.dartExecutor.binaryMessenger, MEDIA_CONTROLS_CHANNEL)
+                    .invokeMethod(action, null)
+            }
         }
     }
 
@@ -248,26 +400,74 @@ class MainActivity : FlutterActivity() {
                     MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CONTROLS_CHANNEL)
                         .invokeMethod("previous", null)
                 }
+
+                override fun onSeekTo(pos: Long) {
+                    android.util.Log.d("MediaSession", "onSeekTo called: $pos")
+                    currentPosition = pos
+                    MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CONTROLS_CHANNEL)
+                        .invokeMethod("seek", mapOf("position" to pos.toInt()))
+                }
+
+                override fun onStop() {
+                    android.util.Log.d("MediaSession", "onStop called")
+                    handleMediaAction("close")
+                }
             })
             isActive = true
         }
     }
 
-    private fun updatePlaybackState(playing: Boolean) {
+    private fun updatePlaybackState(playing: Boolean, position: Long = 0) {
         val state = if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
+        val playbackSpeed = if (playing) 1.0f else 0.0f
         val playbackState = PlaybackStateCompat.Builder()
-            .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, 1.0f)
+            .setState(state, position, playbackSpeed, android.os.SystemClock.elapsedRealtime())
             .setActions(
                 PlaybackStateCompat.ACTION_PLAY or
                 PlaybackStateCompat.ACTION_PAUSE or
                 PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                PlaybackStateCompat.ACTION_SEEK_TO or
+                PlaybackStateCompat.ACTION_STOP
             )
             .build()
         mediaSession?.setPlaybackState(playbackState)
     }
 
-    private fun updateNotification(title: String, artist: String, playing: Boolean) {
+    private fun updateMediaSessionMetadata(title: String, artist: String, album: String, thumbnailPath: String?, duration: Long = 0) {
+        // Load artwork if available
+        var artwork: android.graphics.Bitmap? = null
+        if (thumbnailPath != null) {
+            try {
+                val file = java.io.File(thumbnailPath)
+                if (file.exists()) {
+                    artwork = BitmapFactory.decodeFile(thumbnailPath)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error loading artwork for MediaSession: ${e.message}")
+            }
+        }
+
+        // Build and set MediaSession metadata
+        val metadataBuilder = MediaMetadataCompat.Builder()
+            .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, album)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_DESCRIPTION, album)
+            .putLong(MediaMetadataCompat.METADATA_KEY_DURATION, duration)
+
+        // Add artwork if available
+        if (artwork != null) {
+            metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artwork)
+            metadataBuilder.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artwork)
+        }
+
+        mediaSession?.setMetadata(metadataBuilder.build())
+    }
+
+    private fun updateNotification(title: String, artist: String, playing: Boolean, thumbnailPath: String?) {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -276,35 +476,43 @@ class MainActivity : FlutterActivity() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Load artwork if available
+        var artwork: android.graphics.Bitmap? = null
+        if (thumbnailPath != null) {
+            try {
+                val file = java.io.File(thumbnailPath)
+                if (file.exists()) {
+                    artwork = BitmapFactory.decodeFile(thumbnailPath)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("MainActivity", "Error loading artwork: ${e.message}")
+            }
+        }
+
         // Create action intents that directly call the media session
         val playIntent = Intent("com.vibewave.player.PLAY")
         val pauseIntent = Intent("com.vibewave.player.PAUSE")
         val previousIntent = Intent("com.vibewave.player.PREVIOUS")
         val nextIntent = Intent("com.vibewave.player.NEXT")
+        val closeIntent = Intent("com.vibewave.player.CLOSE")
+        
+        // Open app intent
+        val openAppIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        }
 
         val playPendingIntent = PendingIntent.getBroadcast(this, 0, playIntent, PendingIntent.FLAG_IMMUTABLE)
         val pausePendingIntent = PendingIntent.getBroadcast(this, 1, pauseIntent, PendingIntent.FLAG_IMMUTABLE)
         val previousPendingIntent = PendingIntent.getBroadcast(this, 2, previousIntent, PendingIntent.FLAG_IMMUTABLE)
         val nextPendingIntent = PendingIntent.getBroadcast(this, 3, nextIntent, PendingIntent.FLAG_IMMUTABLE)
+        val openAppPendingIntent = PendingIntent.getActivity(this, 4, openAppIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val closePendingIntent = PendingIntent.getBroadcast(this, 5, closeIntent, PendingIntent.FLAG_IMMUTABLE)
 
-        val playPauseAction = if (playing) {
-            NotificationCompat.Action.Builder(
-                android.R.drawable.ic_media_pause,
-                "Pause",
-                pausePendingIntent
-            ).build()
-        } else {
-            NotificationCompat.Action.Builder(
-                android.R.drawable.ic_media_play,
-                "Play",
-                playPendingIntent
-            ).build()
-        }
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_media_play)
+        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(artist)
+            .setSubText("VibeWave Player")
             .setContentIntent(pendingIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -312,10 +520,7 @@ class MainActivity : FlutterActivity() {
             .setShowWhen(false)
             .setOnlyAlertOnce(true)
             .setColorized(true)
-            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
-                .setMediaSession(mediaSession?.sessionToken)
-                .setShowActionsInCompactView(0, 1, 2)
-                .setShowCancelButton(false))
+            .setColor(0xFFFF6B35.toInt())
             .addAction(
                 NotificationCompat.Action.Builder(
                     android.R.drawable.ic_media_previous,
@@ -323,7 +528,13 @@ class MainActivity : FlutterActivity() {
                     previousPendingIntent
                 ).build()
             )
-            .addAction(playPauseAction)
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    if (playing) android.R.drawable.ic_media_pause else android.R.drawable.ic_media_play,
+                    if (playing) "Pause" else "Play",
+                    if (playing) pausePendingIntent else playPendingIntent
+                ).build()
+            )
             .addAction(
                 NotificationCompat.Action.Builder(
                     android.R.drawable.ic_media_next,
@@ -331,15 +542,43 @@ class MainActivity : FlutterActivity() {
                     nextPendingIntent
                 ).build()
             )
+            .addAction(
+                NotificationCompat.Action.Builder(
+                    android.R.drawable.ic_menu_close_clear_cancel,
+                    "Close",
+                    closePendingIntent
+                ).build()
+            )
+            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
+                .setMediaSession(mediaSession?.sessionToken)
+                .setShowActionsInCompactView(0, 1, 2)
+                .setShowCancelButton(false))
             .setOngoing(playing)
-            .setAutoCancel(false)
-            .build()
+            .setAutoCancel(!playing)
+            .setDeleteIntent(closePendingIntent)
 
+        // Add large icon (artwork) if available
+        if (artwork != null) {
+            notificationBuilder.setLargeIcon(artwork)
+        }
+
+        val notification = notificationBuilder.build()
         notificationManager?.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun getIconBitmap(resId: Int): Bitmap {
+        return BitmapFactory.decodeResource(resources, resId)
     }
 
     private fun hideNotification() {
         notificationManager?.cancel(NOTIFICATION_ID)
+        // Try using NotificationManagerCompat as well
+        try {
+            val compat = androidx.core.app.NotificationManagerCompat.from(this)
+            compat.cancel(NOTIFICATION_ID)
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "NotificationManagerCompat cancel failed: ${e.message}")
+        }
     }
 
     private fun getStoragePaths(): List<String> {

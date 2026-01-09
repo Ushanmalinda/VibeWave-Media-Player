@@ -1,14 +1,22 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:path/path.dart' as p;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/media_item.dart';
 import '../models/folder_item.dart';
+import 'thumbnail_service.dart';
 
 class MediaScanner {
   static const platform = MethodChannel('com.example.media_player_app/storage');
   static bool _isRequestingPermissions = false;
   static bool? _hasPermissions;
+  static List<FolderItem>? _cachedAudioFolders;
+  static List<FolderItem>? _cachedVideoFolders;
+  static const String _audioCacheKey = 'cached_audio_folders';
+  static const String _videoCacheKey = 'cached_video_folders';
+  static const String _lastScanTimeKey = 'last_scan_time';
 
   static final List<String> _audioExtensions = [
     '.mp3',
@@ -73,16 +81,124 @@ class MediaScanner {
     return true;
   }
 
-  static Future<List<FolderItem>> scanAudioFiles() async {
+  static Future<List<FolderItem>> scanAudioFiles({
+    bool forceRescan = false,
+  }) async {
     final hasPermission = await requestPermissions();
     if (!hasPermission) return [];
-    return await _scanMediaFiles(MediaType.audio);
+
+    // Return cached data if available and not forcing rescan
+    if (!forceRescan && _cachedAudioFolders != null) {
+      return _cachedAudioFolders!;
+    }
+
+    // Try to load from persistent storage
+    if (!forceRescan) {
+      final cached = await _loadCachedFolders(_audioCacheKey);
+      if (cached != null && cached.isNotEmpty) {
+        _cachedAudioFolders = cached;
+        return cached;
+      }
+    }
+
+    // Perform scan
+    final folders = await _scanMediaFiles(MediaType.audio);
+    _cachedAudioFolders = folders;
+
+    // Save to cache
+    await _saveCachedFolders(_audioCacheKey, folders);
+
+    return folders;
   }
 
-  static Future<List<FolderItem>> scanVideoFiles() async {
+  static Future<List<FolderItem>> scanVideoFiles({
+    bool forceRescan = false,
+  }) async {
     final hasPermission = await requestPermissions();
     if (!hasPermission) return [];
-    return await _scanMediaFiles(MediaType.video);
+
+    // Return cached data if available and not forcing rescan
+    if (!forceRescan && _cachedVideoFolders != null) {
+      return _cachedVideoFolders!;
+    }
+
+    // Try to load from persistent storage
+    if (!forceRescan) {
+      final cached = await _loadCachedFolders(_videoCacheKey);
+      if (cached != null && cached.isNotEmpty) {
+        _cachedVideoFolders = cached;
+        return cached;
+      }
+    }
+
+    // Perform scan
+    final folders = await _scanMediaFiles(MediaType.video);
+    _cachedVideoFolders = folders;
+
+    // Save to cache
+    await _saveCachedFolders(_videoCacheKey, folders);
+
+    return folders;
+  }
+
+  static Future<void> clearCache() async {
+    _cachedAudioFolders = null;
+    _cachedVideoFolders = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_audioCacheKey);
+    await prefs.remove(_videoCacheKey);
+    await prefs.remove(_lastScanTimeKey);
+  }
+
+  static Future<void> _saveCachedFolders(
+    String key,
+    List<FolderItem> folders,
+  ) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonData = folders
+          .map(
+            (folder) => {
+              'name': folder.name,
+              'path': folder.path,
+              'mediaFiles': folder.mediaFiles
+                  .map((media) => media.toJson())
+                  .toList(),
+            },
+          )
+          .toList();
+      await prefs.setString(key, json.encode(jsonData));
+      await prefs.setInt(
+        _lastScanTimeKey,
+        DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (e) {
+      // Silently handle cache save errors
+    }
+  }
+
+  static Future<List<FolderItem>?> _loadCachedFolders(String key) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonString = prefs.getString(key);
+      if (jsonString == null) return null;
+
+      final List<dynamic> jsonData = json.decode(jsonString);
+      return jsonData
+          .map(
+            (folderJson) => FolderItem(
+              name: folderJson['name'] as String,
+              path: folderJson['path'] as String,
+              mediaFiles: (folderJson['mediaFiles'] as List)
+                  .map((mediaJson) => MediaItem.fromJson(mediaJson))
+                  .toList(),
+            ),
+          )
+          .toList();
+    } catch (e) {
+      // If cache is corrupted, return null to trigger rescan
+      return null;
+    }
   }
 
   static Future<List<FolderItem>> _scanMediaFiles(MediaType type) async {
@@ -185,6 +301,18 @@ class MediaScanner {
             final folderPath = p.dirname(entity.path);
             final title = p.basenameWithoutExtension(entity.path);
 
+            // Generate thumbnail path based on media type
+            String? thumbnailPath;
+            if (type == MediaType.audio) {
+              thumbnailPath = await ThumbnailService.getAudioThumbnailPath(
+                entity.path,
+              );
+            } else {
+              thumbnailPath = await ThumbnailService.getVideoThumbnail(
+                entity.path,
+              );
+            }
+
             final mediaItem = MediaItem(
               id: entity.path,
               title: title,
@@ -192,6 +320,7 @@ class MediaScanner {
               type: type,
               artist: _extractArtistFromPath(entity.path),
               album: p.basename(folderPath),
+              thumbnailPath: thumbnailPath,
             );
 
             folderMap.putIfAbsent(folderPath, () => []);
