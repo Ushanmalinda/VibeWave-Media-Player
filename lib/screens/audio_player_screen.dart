@@ -103,6 +103,13 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
         // Load the audio file into the player so play button works
         try {
           await _audioPlayer.setFilePath(playlist[currentIndex].path);
+
+          // Update audio service notification
+          AudioPlayerService().updateCurrentMediaItem(
+            title: item.title,
+            artist: item.artist,
+            duration: _audioPlayer.duration,
+          );
         } catch (e) {
           // File might not exist anymore
         }
@@ -358,6 +365,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
       );
 
       await _audioPlayer.setFilePath(_playlist[index].path);
+
+      // Update audio service notification
+      AudioPlayerService().updateCurrentMediaItem(
+        title: media.title,
+        artist: media.artist,
+        duration: _audioPlayer.duration,
+      );
+
       await _audioPlayer.play();
 
       // Save as last played song
@@ -390,6 +405,14 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
       );
 
       await _audioPlayer.setFilePath(_playlist[index].path);
+
+      // Update audio service notification
+      AudioPlayerService().updateCurrentMediaItem(
+        title: media.title,
+        artist: media.artist,
+        duration: _audioPlayer.duration,
+      );
+
       await _audioPlayer.play();
     } catch (e) {
       _showError('Error playing audio: $e');

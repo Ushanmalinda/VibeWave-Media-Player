@@ -1,11 +1,14 @@
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
+import 'package:audio_service/audio_service.dart';
 import 'equalizer_service.dart';
+import 'background_audio_handler.dart';
 
 class AudioPlayerService {
   static final AudioPlayerService _instance = AudioPlayerService._internal();
   factory AudioPlayerService() => _instance;
   AudioPlayerService._internal() {
+    _initializeAudioService();
     _setupAudioSession();
     _setupPlayerListener();
     _optimizeForLowEndDevices();
@@ -18,8 +21,28 @@ class AudioPlayerService {
   final EqualizerService _equalizerService = EqualizerService();
   bool _equalizerInitialized = false;
   int? _currentAudioSessionId;
+  BackgroundAudioHandler? _audioHandler;
 
   AudioPlayer get player => _audioPlayer;
+  BackgroundAudioHandler? get audioHandler => _audioHandler;
+
+  /// Initialize audio service for background playback
+  Future<void> _initializeAudioService() async {
+    try {
+      _audioHandler = await AudioService.init(
+        builder: () => BackgroundAudioHandler(_audioPlayer),
+        config: const AudioServiceConfig(
+          androidNotificationChannelId: 'com.vibewave.player.audio',
+          androidNotificationChannelName: 'VibeWave Player',
+          androidNotificationOngoing: false,
+          androidStopForegroundOnPause: true,
+        ),
+      );
+      print('Audio service initialized successfully');
+    } catch (e) {
+      print('Failed to initialize audio service: $e');
+    }
+  }
 
   Future<void> _setupAudioSession() async {
     try {
@@ -101,6 +124,19 @@ class AudioPlayerService {
       await _ensureEqualizerInitialized();
     }
     await _equalizerService.updateSettings();
+  }
+
+  /// Update the current playing media item in notification
+  void updateCurrentMediaItem({
+    required String title,
+    String? artist,
+    Duration? duration,
+  }) {
+    _audioHandler?.updateNowPlaying(
+      title,
+      artist ?? 'Unknown Artist',
+      duration: duration,
+    );
   }
 
   void _optimizeForLowEndDevices() {

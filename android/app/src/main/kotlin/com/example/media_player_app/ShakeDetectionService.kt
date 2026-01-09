@@ -31,13 +31,15 @@ class ShakeDetectionService(
         if (isEnabled) return
         
         // Acquire wake lock to keep CPU running when screen is off
+        // Using timeout to prevent battery drain (10 hours = 36000000ms)
         val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
         wakeLock = powerManager.newWakeLock(
             PowerManager.PARTIAL_WAKE_LOCK,
             "MediaPlayer:ShakeDetectionWakeLock"
         )
-        wakeLock?.acquire()
-        android.util.Log.d("ShakeDetection", "Wake lock acquired")
+        // Acquire with 10-hour timeout to prevent indefinite lock
+        wakeLock?.acquire(10*60*60*1000L) // 10 hours
+        android.util.Log.d("ShakeDetection", "Wake lock acquired with 10-hour timeout")
         
         sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
         accelerometer = sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)

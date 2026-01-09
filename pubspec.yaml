@@ -76,6 +76,9 @@ dependencies:
   # Audio session for headset controls
   audio_session: ^0.1.21
   
+  # Audio service for foreground playback (prevents app from being killed)
+  audio_service: ^0.18.15
+  
   # URL launcher for links
   url_launcher: ^6.3.1
 
