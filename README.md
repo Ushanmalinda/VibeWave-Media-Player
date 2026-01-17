@@ -165,3 +165,11 @@ Potential features for future versions:
 - [ ] Search and filter functionality
 - [ ] Sort by name, artist, album, duration
 - [ ] Online radio streaming
+
+## 👤 Author
+
+**Ushanmalinda**
+- GitHub: [@Ushanmalinda](https://github.com/Ushanmalinda)
+- Project Maintainer & Creator
+
+This project is developed and maintained by Ushanmalinda.
