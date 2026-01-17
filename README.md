@@ -4,7 +4,7 @@ A professional Flutter media player app inspired by AIMP player, featuring **aut
 
 ## Features
 
-### 🎵 Professional Audio Player (AIMP-Style)
+### 🎵 Professional Audio Player
 - **Auto-Scan on Startup**: Automatically finds all audio files when you open the app
 - **Folder-Based Navigation**: Browse your music library organized by folders
 - **Smart File Detection**: Scans common directories (Music, Downloads, DCIM, etc.)
@@ -92,36 +92,6 @@ A professional Flutter media player app inspired by AIMP player, featuring **aut
 - Tap video to show/hide controls
 - Use controls to play, pause, skip, and seek
 
-## Setup and Installation
-
-### Prerequisites
-- Flutter SDK (3.9.2 or higher)
-- Android Studio or VS Code with Flutter extensions
-- Android device or emulator
-
-### Installation Steps
-
-1. Clone or download this project
-
-2. Install dependencies:
-   ```bash
-   flutter pub get
-   ```
-
-3. Run the app:
-   ```bash
-   flutter run
-   ```
-
-### Building APK
-
-To build a release APK:
-```bash
-flutter build apk --release
-```
-
-The APK will be available at: `build/app/outputs/flutter-apk/app-release.apk`
-
 ## Permissions
 
 The app requires the following permissions (already configured in AndroidManifest.xml):
@@ -155,18 +125,6 @@ The app requires the following permissions (already configured in AndroidManifes
 - **path**: ^1.9.1 - Path utilities
 - **path_provider**: ^2.1.5 - Path provider
 
-## Project Structure
-
-```
-lib/
-├── main.dart                          # App entry point
-├── models/
-│   └── media_item.dart               # Media item model
-└── screens/
-    ├── home_screen.dart              # Home screen with tabs
-    ├── audio_player_screen.dart      # Audio player UI
-    └── video_player_screen.dart      # Video player UI
-```
 
 ## Supported Formats
 
@@ -204,40 +162,6 @@ lib/
 ## Future Enhancements
 
 Potential features for future versions:
-- [ ] Background audio playback with media notifications
-- [ ] Lock screen controls
-- [ ] Bass boost and equalizer
-- [ ] Save and load custom playlists
-- [ ] Album art extraction from audio files
-- [ ] Audio metadata parsing (ID3 tags)
-- [ ] Queue management
 - [ ] Search and filter functionality
 - [ ] Sort by name, artist, album, duration
-- [ ] Favorite/bookmark songs
-- [ ] Recently played section
-- [ ] Sleep timer
-- [ ] Crossfade between tracks
-- [ ] Gapless playback
-- [ ] Lyrics display
 - [ ] Online radio streaming
-
-## License
-
-This project is created for educational purposes.
-
-## Contributing
-
-Feel free to fork this project and submit pull requests for any improvements!
-
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
