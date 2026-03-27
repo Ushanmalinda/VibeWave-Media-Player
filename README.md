@@ -39,6 +39,14 @@ A professional Flutter media player app inspired by AIMP player, featuring **aut
 - 📱 Optimized for Android
 - 💿 Tab-based navigation between Music and Videos
 
+## 👤 Author
+
+**Ushanmalinda**
+- GitHub: [@Ushanmalinda](https://github.com/Ushanmalinda)
+- Project Maintainer & Creator
+
+This project is developed and maintained by Ushanmalinda.
+
 ## How to Use
 
 ### 🎵 Music Player
