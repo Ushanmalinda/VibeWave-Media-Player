@@ -31,7 +31,7 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
   final PlaybackManager _playbackManager = PlaybackManager();
   final ControlsManager _controlsManager = ControlsManager();
   final SettingsService _settings = SettingsService();
-  final VolumeController _volumeController = VolumeController();
+  final VolumeController _volumeController = VolumeController.instance;
   List<FolderItem> _folders = [];
   List<MediaItem> _playlist = [];
   int _currentIndex = -1;

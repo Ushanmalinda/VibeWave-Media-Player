@@ -1350,7 +1350,7 @@ class _FullScreenVideoWidgetState extends State<_FullScreenVideoWidget> {
   double _currentVolume = 0.5;
   double? _originalBrightness;
   double? _originalVolume;
-  final VolumeController _volumeController = VolumeController();
+  final VolumeController _volumeController = VolumeController.instance;
 
   @override
   void initState() {
@@ -1413,7 +1413,7 @@ class _FullScreenVideoWidgetState extends State<_FullScreenVideoWidget> {
 
   Future<void> _setVolume(double volume) async {
     try {
-      _volumeController.setVolume(volume.clamp(0.0, 1.0), showSystemUI: false);
+      _volumeController.setVolume(volume.clamp(0.0, 1.0));
       setState(() {
         _currentVolume = volume.clamp(0.0, 1.0);
       });

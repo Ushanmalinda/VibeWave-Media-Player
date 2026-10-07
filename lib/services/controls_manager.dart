@@ -17,7 +17,7 @@ class ControlsManager {
   final SettingsService _settings = SettingsService();
   final AudioPlayerService _audioService = AudioPlayerService();
   final QueueService _queueService = QueueService();
-  final VolumeController _volumeController = VolumeController();
+  final VolumeController _volumeController = VolumeController.instance;
 
   static const platform = MethodChannel('com.vibewave.player/shake');
 
@@ -223,7 +223,7 @@ class ControlsManager {
 
   // Volume Button Listener
   void _setupVolumeListener() {
-    _volumeSubscription = _volumeController.listener((volume) {
+    _volumeController.addListener((volume) {
       _handleVolumeChange(volume);
     });
   }
