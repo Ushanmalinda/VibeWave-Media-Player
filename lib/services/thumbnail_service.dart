@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'package:video_thumbnail/video_thumbnail.dart';
+import 'package:get_thumbnail_video/index.dart';
+import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:audiotags/audiotags.dart';
 import 'package:crypto/crypto.dart';
@@ -101,7 +102,7 @@ class ThumbnailService {
         quality: 75,
       );
 
-      return thumbnail;
+      return thumbnail.path;
     } catch (e) {
       // Silently handle errors - some files may have corrupted metadata
       return null;

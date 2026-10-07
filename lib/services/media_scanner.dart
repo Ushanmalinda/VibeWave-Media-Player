@@ -62,11 +62,16 @@ class MediaScanner {
     if (Platform.isAndroid) {
       _isRequestingPermissions = true;
       try {
-        // Request only media permissions (no MANAGE_EXTERNAL_STORAGE)
-        final audioStatus = await Permission.audio.request();
-        final videoStatus = await Permission.videos.request();
+        // Request storage for Android <= 12 and media permissions for Android >= 13
+        Map<Permission, PermissionStatus> statuses = await [
+          Permission.storage,
+          Permission.audio,
+          Permission.videos,
+        ].request();
 
-        _hasPermissions = audioStatus.isGranted && videoStatus.isGranted;
+        _hasPermissions = (statuses[Permission.storage]?.isGranted ?? false) ||
+            ((statuses[Permission.audio]?.isGranted ?? false) &&
+                (statuses[Permission.videos]?.isGranted ?? false));
         return _hasPermissions!;
       } catch (e) {
         // Silently handle permission errors

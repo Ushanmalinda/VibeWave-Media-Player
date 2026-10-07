@@ -19,8 +19,9 @@ import androidx.core.app.NotificationCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import com.ryanheise.audioservice.AudioServiceActivity
 
-class MainActivity : FlutterActivity() {
+class MainActivity : AudioServiceActivity() {
     private val STORAGE_CHANNEL = "com.example.media_player_app/storage"
     private val EQUALIZER_CHANNEL = "com.media_player_app/equalizer"
     private val BACK_CHANNEL = "android/back/pressed"

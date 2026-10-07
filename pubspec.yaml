@@ -61,7 +61,7 @@ dependencies:
   shared_preferences: ^2.3.3
   
   # Thumbnail generation
-  video_thumbnail: ^0.5.3
+  get_thumbnail_video: ^0.7.3
   audiotags: ^1.0.1
   
   # Crypto for hash generation
