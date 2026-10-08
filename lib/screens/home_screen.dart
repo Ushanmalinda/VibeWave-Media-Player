@@ -17,6 +17,7 @@ import '../services/bookmarks_service.dart';
 import '../services/playlist_service.dart';
 import '../services/last_played_service.dart';
 import '../services/playback_manager.dart';
+import '../services/playback_history_service.dart';
 import '../models/media_item.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -42,17 +43,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _loadLastPlayedSong() async {
     final last = await LastPlayedService.loadLastPlayed();
-    if (last != null) {
+    if (last != null && last['item'] != null) {
       try {
         final item = MediaItem.fromJson(
           Map<String, dynamic>.from(last['item']),
         );
-        // Update PlaybackManager so MiniPlayer can show the last played song
         _playbackManager.updateCurrentlyPlaying(item);
+        return;
       } catch (e) {
         // Error loading last played song
       }
     }
+
+    // Fallback: Check playback history so last played video or song appears
+    try {
+      await PlaybackHistoryService().initialize();
+      if (PlaybackHistoryService().history.isNotEmpty) {
+        _playbackManager.updateCurrentlyPlaying(
+          PlaybackHistoryService().history.first,
+        );
+      }
+    } catch (_) {}
   }
 
   // Keep all screens alive to maintain playback state

@@ -80,6 +80,11 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       await _favoritesService.initialize();
       await _historyService.initialize();
 
+      if (_playbackManager.currentlyPlaying == null &&
+          _historyService.history.isNotEmpty) {
+        _playbackManager.updateCurrentlyPlaying(_historyService.history.first);
+      }
+
       if (mounted) {
         setState(() {
           _audioCount = totalAudioFiles;
@@ -135,7 +140,20 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             const SizedBox(height: 12),
             MiniPlayer(
               audioPlayer: AudioPlayerService().player,
-              onTap: () => widget.onNavigate?.call(1),
+              onTap: () {
+                final current = _playbackManager.currentlyPlaying ??
+                    _historyService.history.firstOrNull;
+                if (current != null && current.type == MediaType.video) {
+                  VideoPlayerScreen.playExternalVideo(current);
+                  widget.onNavigate?.call(2);
+                } else {
+                  widget.onNavigate?.call(1);
+                }
+              },
+              onPlayVideo: (video) {
+                VideoPlayerScreen.playExternalVideo(video);
+                widget.onNavigate?.call(2);
+              },
             ),
             const SizedBox(height: 24),
 

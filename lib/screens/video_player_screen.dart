@@ -13,6 +13,9 @@ import '../services/favorites_service.dart';
 import '../services/bookmarks_service.dart';
 import '../services/queue_service.dart';
 import '../services/playback_history_service.dart';
+import '../services/playback_manager.dart';
+import '../services/last_played_service.dart';
+import '../services/audio_player_service.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   const VideoPlayerScreen({super.key});
@@ -64,6 +67,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
+    PlaybackManager().updatePlayingState(false);
     _hideControlsTimer?.cancel();
     _positionUpdateTimer?.cancel();
     _fullscreenUpdateNotifier.dispose();
@@ -325,6 +329,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   void _backToFolders() {
     // Pause and dispose video when going back to folders
     _controller?.pause();
+    PlaybackManager().updatePlayingState(false);
     setState(() {
       _isPlaying = false;
       _isInFolderView = true;
@@ -358,7 +363,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   Future<void> _playVideo(int index) async {
     if (index < 0 || index >= _videoList.length) return;
 
-    PlaybackHistoryService().addToHistory(_videoList[index]);
+    final videoItem = _videoList[index];
+    PlaybackHistoryService().addToHistory(videoItem);
+    PlaybackManager().updateCurrentlyPlaying(videoItem);
+    PlaybackManager().updatePlayingState(true);
+    LastPlayedService.saveLastPlayed(videoItem, index, _videoList);
+
+    // Pause audio playback if currently active
+    try {
+      if (AudioPlayerService().player.playing) {
+        AudioPlayerService().player.pause();
+      }
+    } catch (_) {}
 
     // Properly dispose old controller
     final oldController = _controller;
@@ -370,7 +386,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
     try {
       _controller = VideoPlayerController.file(
-        File(_videoList[index].path),
+        File(videoItem.path),
         videoPlayerOptions: VideoPlayerOptions(
           mixWithOthers: false,
           allowBackgroundPlayback: false,
@@ -388,17 +404,22 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           _playNext();
         }
 
-        // Update UI when playing state changes
+        // Update UI and playback manager when playing state changes
         final isNowPlaying = _controller!.value.isPlaying;
         if (_isPlaying != isNowPlaying) {
           setState(() {
             _isPlaying = isNowPlaying;
           });
+          PlaybackManager().updatePlayingState(isNowPlaying);
           _startPositionUpdateTimer();
         }
+
+        PlaybackManager().updatePosition(_controller!.value.position);
+        PlaybackManager().updateDuration(_controller!.value.duration);
       });
 
       await _controller!.play();
+      PlaybackManager().updatePlayingState(true);
       _startPositionUpdateTimer();
       if (mounted) {
         setState(() {});
@@ -418,10 +439,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       await _controller!.pause();
       _hideControlsTimer?.cancel();
       _positionUpdateTimer?.cancel();
+      PlaybackManager().updatePlayingState(false);
     } else {
       await _controller!.play();
       _startHideControlsTimer();
       _startPositionUpdateTimer();
+      PlaybackManager().updatePlayingState(true);
     }
   }
 
