@@ -132,14 +132,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Now Playing section
-            Text(
-              'Now Playing',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
             const SizedBox(height: 12),
             MiniPlayer(
               audioPlayer: AudioPlayerService().player,
@@ -148,14 +140,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             const SizedBox(height: 24),
 
             // Quick access section
-            Text(
-              'Quick Access',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.9),
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -166,7 +150,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     subtitle:
                         '$_audioCount ${_audioCount == 1 ? 'song' : 'songs'}',
                     color: Colors.orange,
-                    backgroundMedia: _historyService.history
+                    backgroundMedia:
+                        _historyService.history
                             .where((m) => m.type == MediaType.audio)
                             .firstOrNull ??
                         _sampleAudioItem,
@@ -182,7 +167,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     subtitle:
                         '$_videoCount ${_videoCount == 1 ? 'video' : 'videos'}',
                     color: Colors.blue,
-                    backgroundMedia: _historyService.history
+                    backgroundMedia:
+                        _historyService.history
                             .where((m) => m.type == MediaType.video)
                             .firstOrNull ??
                         _sampleVideoItem,
@@ -214,7 +200,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     title: 'Queue',
                     subtitle: 'Now playing',
                     color: Colors.purple,
-                    backgroundMedia: _playbackManager.currentlyPlaying ??
+                    backgroundMedia:
+                        _playbackManager.currentlyPlaying ??
                         QueueService().queue.firstOrNull,
                     onTap: () => widget.onNavigate?.call(6),
                   ),
@@ -389,8 +376,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             offset: const Offset(0, 5),
           ),
           BoxShadow(
-            color:
-                (isAudio ? Colors.orange : Colors.blue).withValues(alpha: 0.08),
+            color: (isAudio ? Colors.orange : Colors.blue).withValues(
+              alpha: 0.08,
+            ),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -401,9 +389,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         child: Stack(
           children: [
             // 1. Current song/video background artwork
-            Positioned.fill(
-              child: _buildHistoryBackground(item),
-            ),
+            Positioned.fill(child: _buildHistoryBackground(item)),
 
             // 2. Crystal glass blur & dark frosted tint overlay
             Positioned.fill(
@@ -701,11 +687,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         ),
         borderRadius: BorderRadius.circular(10),
       ),
-      child: const Icon(
-        Icons.videocam_rounded,
-        color: Colors.blue,
-        size: 24,
-      ),
+      child: const Icon(Icons.videocam_rounded, color: Colors.blue, size: 24),
     );
   }
 
