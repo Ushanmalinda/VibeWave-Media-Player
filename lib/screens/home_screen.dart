@@ -80,6 +80,10 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   void _navigateToScreen(int index) {
+    if (_selectedDrawerIndex == 2 && index != 2) {
+      VideoPlayerScreen.activeState?.pauseVideo();
+      PlaybackManager().setFullVideoActive(false);
+    }
     setState(() {
       _selectedDrawerIndex = index;
       _isSearching = false;
@@ -290,6 +294,10 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!didPop) {
           if (_selectedDrawerIndex != 0) {
             // If not on home dashboard, go back to home
+            if (_selectedDrawerIndex == 2) {
+              VideoPlayerScreen.activeState?.pauseVideo();
+              PlaybackManager().setFullVideoActive(false);
+            }
             setState(() {
               _selectedDrawerIndex = 0;
             });
@@ -394,8 +402,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Home',
                 isSelected: _selectedDrawerIndex == 0,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 0);
                   Navigator.pop(context);
+                  _navigateToScreen(0);
                 },
               ),
               _buildDrawerItem(
@@ -403,8 +411,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'My Music',
                 isSelected: _selectedDrawerIndex == 1,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 1);
                   Navigator.pop(context);
+                  _navigateToScreen(1);
                 },
               ),
               _buildDrawerItem(
@@ -412,8 +420,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'My Videos',
                 isSelected: _selectedDrawerIndex == 2,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 2);
                   Navigator.pop(context);
+                  _navigateToScreen(2);
                 },
               ),
               _buildDrawerItem(
@@ -421,8 +429,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Sound Effects',
                 isSelected: _selectedDrawerIndex == 3,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 3);
                   Navigator.pop(context);
+                  _navigateToScreen(3);
                 },
               ),
               _buildDrawerItem(
@@ -430,8 +438,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Bookmarks',
                 isSelected: _selectedDrawerIndex == 4,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 4);
                   Navigator.pop(context);
+                  _navigateToScreen(4);
                 },
               ),
               _buildDrawerItem(
@@ -439,8 +447,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Favorites',
                 isSelected: _selectedDrawerIndex == 5,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 5);
                   Navigator.pop(context);
+                  _navigateToScreen(5);
                 },
               ),
               _buildDrawerItem(
@@ -448,8 +456,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Queue',
                 isSelected: _selectedDrawerIndex == 6,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 6);
                   Navigator.pop(context);
+                  _navigateToScreen(6);
                 },
               ),
               const Divider(
@@ -477,12 +485,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 isOrange: true,
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() {
-                    _selectedDrawerIndex = 7;
-                    _isSearching = false;
-                    _searchController.clear();
-                    _searchQuery = '';
-                  });
+                  _navigateToScreen(7);
                 },
               ),
               const SizedBox(height: 16),
@@ -497,8 +500,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: 'Settings',
                 isSelected: _selectedDrawerIndex == 8,
                 onTap: () {
-                  setState(() => _selectedDrawerIndex = 8);
                   Navigator.pop(context);
+                  _navigateToScreen(8);
                 },
               ),
               _buildDrawerItem(

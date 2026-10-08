@@ -8,13 +8,22 @@ class PlaybackManager extends ChangeNotifier {
 
   MediaItem? _currentlyPlaying;
   bool _isPlaying = false;
+  bool _isFullVideoActive = false;
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
 
   MediaItem? get currentlyPlaying => _currentlyPlaying;
   bool get isPlaying => _isPlaying;
+  bool get isFullVideoActive => _isFullVideoActive;
   Duration get position => _position;
   Duration get duration => _duration;
+
+  void setFullVideoActive(bool active) {
+    if (_isFullVideoActive != active) {
+      _isFullVideoActive = active;
+      notifyListeners();
+    }
+  }
 
   void updateCurrentlyPlaying(MediaItem? item) {
     _currentlyPlaying = item;

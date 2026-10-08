@@ -84,6 +84,13 @@ class _MiniPlayerState extends State<MiniPlayer> {
 
   void _onPlaybackChanged() {
     if (!mounted) return;
+    if (_playbackManager.isFullVideoActive) {
+      if (_videoController != null) {
+        _disposeVideoController();
+      }
+      setState(() {});
+      return;
+    }
     final current = _playbackManager.currentlyPlaying ??
         _historyService.history.firstOrNull;
     if (current != null && current.type == MediaType.video) {
@@ -98,6 +105,13 @@ class _MiniPlayerState extends State<MiniPlayer> {
 
   void _onHistoryChanged() {
     if (!mounted) return;
+    if (_playbackManager.isFullVideoActive) {
+      if (_videoController != null) {
+        _disposeVideoController();
+      }
+      setState(() {});
+      return;
+    }
     final current = _playbackManager.currentlyPlaying ??
         _historyService.history.firstOrNull;
     if (current != null && current.type == MediaType.video) {
@@ -270,6 +284,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
       _playbackManager.updateDuration(ctrl.value.duration);
       ctrl.pause();
     }
+    _disposeVideoController();
+    _playbackManager.setFullVideoActive(true);
     if (widget.onPlayVideo != null) {
       widget.onPlayVideo!(item);
     } else {
@@ -646,7 +662,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 child: isInitialized
                     ? Center(
                         child: AspectRatio(
-                          aspectRatio: ctrl!.value.aspectRatio,
+                          aspectRatio: ctrl.value.aspectRatio,
                           child: VideoPlayer(ctrl),
                         ),
                       )
@@ -782,12 +798,6 @@ class _MiniPlayerState extends State<MiniPlayer> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // Open fullscreen in video player screen
-                      _buildGlassActionBtn(
-                        icon: Icons.fullscreen_rounded,
-                        iconColor: Colors.white,
-                        onTap: () => _openFullVideo(item),
-                      ),
                     ],
                   ),
                 ),
@@ -916,7 +926,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                             onTap: () => _toggleFavorite(item),
                           ),
                           _buildMiniIconBtn(
-                            icon: Icons.open_in_full_rounded,
+                            icon: Icons.fullscreen_rounded,
+                            size: 22,
                             onTap: () => _openFullVideo(item),
                           ),
                         ],

@@ -20,10 +20,23 @@ import '../services/audio_player_service.dart';
 class VideoPlayerScreen extends StatefulWidget {
   const VideoPlayerScreen({super.key});
 
+  // ignore: library_private_types_in_public_api
+  static _VideoPlayerScreenState? activeState;
   static MediaItem? pendingVideoToPlay;
+  static bool pendingAutoFullScreen = false;
+  static bool pendingOpenedFromExternal = false;
 
-  static void playExternalVideo(MediaItem item) {
+  static void playExternalVideo(
+    MediaItem item, {
+    bool autoFullScreen = false,
+    bool openedFromExternal = false,
+  }) {
     pendingVideoToPlay = item;
+    pendingAutoFullScreen = autoFullScreen;
+    pendingOpenedFromExternal = openedFromExternal;
+    if (activeState != null && activeState!.mounted) {
+      activeState!._triggerPendingVideo();
+    }
   }
 
   @override
@@ -41,11 +54,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   bool _isInFolderView = true;
   bool _isFullScreen = false;
   bool _isLocked = false;
+  bool _launchedFromExternal = false;
   double _playbackSpeed = 1.0;
   String _aspectRatioMode = 'Original'; // Original, Fill, 16:9, 4:3, 21:9
   Timer? _hideControlsTimer;
   Timer? _positionUpdateTimer;
   FolderItem? _currentFolder;
+  StreamSubscription<bool>? _audioStreamSub;
   final FavoritesService _favoritesService = FavoritesService();
   final BookmarksService _bookmarksService = BookmarksService();
   final QueueService _queueService = QueueService();
@@ -54,9 +69,17 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    VideoPlayerScreen.activeState = this;
     _scanMediaFiles();
     _favoritesService.addListener(_onFavoritesChanged);
     _bookmarksService.addListener(_onFavoritesChanged);
+    _audioStreamSub = AudioPlayerService().player.playingStream.listen((playing) {
+      if (playing && _isPlaying) {
+        _controller?.pause();
+        if (mounted) setState(() => _isPlaying = false);
+      }
+    });
+    _triggerPendingVideo();
   }
 
   void _onFavoritesChanged() {
@@ -67,14 +90,29 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   void dispose() {
+    if (VideoPlayerScreen.activeState == this) {
+      VideoPlayerScreen.activeState = null;
+    }
+    _audioStreamSub?.cancel();
     PlaybackManager().updatePlayingState(false);
+    PlaybackManager().setFullVideoActive(false);
     _hideControlsTimer?.cancel();
     _positionUpdateTimer?.cancel();
     _fullscreenUpdateNotifier.dispose();
     _favoritesService.removeListener(_onFavoritesChanged);
+    _bookmarksService.removeListener(_onFavoritesChanged);
     _controller?.dispose();
     _exitFullScreen();
     super.dispose();
+  }
+
+  void pauseVideo() {
+    _controller?.pause();
+    _isPlaying = false;
+    _hideControlsTimer?.cancel();
+    _positionUpdateTimer?.cancel();
+    PlaybackManager().updatePlayingState(false);
+    if (mounted) setState(() {});
   }
 
   void _startHideControlsTimer() {
@@ -114,10 +152,18 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   void _enterFullScreen() {
+    if (_isFullScreen) return;
+
     setState(() {
       _isFullScreen = true;
       _showControls = true; // Ensure controls are shown initially
     });
+
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
 
     Navigator.of(context, rootNavigator: true)
         .push(
@@ -128,30 +174,39 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         )
         .then((_) {
           if (_isFullScreen) {
-            _exitFullScreen();
+            _restorePortraitAfterFullscreen();
           }
         });
 
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
     _startHideControlsTimer(); // Start timer after entering fullscreen
   }
 
-  void _exitFullScreen() {
+  void _restorePortraitAfterFullscreen() {
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
 
-    if (_isFullScreen) {
+    if (_isFullScreen && mounted) {
       setState(() => _isFullScreen = false);
-      if (Navigator.of(context, rootNavigator: true).canPop()) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
+    }
+
+    if (_launchedFromExternal) {
+      _launchedFromExternal = false;
+      final pos = _controller?.value.position ?? Duration.zero;
+      PlaybackManager().updatePosition(pos);
+      _controller?.pause();
+      _isPlaying = false;
+      PlaybackManager().updatePlayingState(false);
+      PlaybackManager().setFullVideoActive(false);
+    }
+  }
+
+  void _exitFullScreen() {
+    _restorePortraitAfterFullscreen();
+    if (mounted && Navigator.of(context, rootNavigator: true).canPop()) {
+      Navigator.of(context, rootNavigator: true).pop();
     }
   }
 
@@ -302,6 +357,23 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       setState(() {
         _folders = folders;
         _isLoading = false;
+        if (!_isInFolderView &&
+            _currentFolder == null &&
+            _currentIndex >= 0 &&
+            _currentIndex < _videoList.length) {
+          final currentVid = _videoList[_currentIndex];
+          for (final f in folders) {
+            final idx = f.mediaFiles.indexWhere(
+              (m) => m.id == currentVid.id || m.path == currentVid.path,
+            );
+            if (idx != -1) {
+              _currentFolder = f;
+              _videoList = f.mediaFiles;
+              _currentIndex = idx;
+              break;
+            }
+          }
+        }
       });
       if (forceRescan && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -330,6 +402,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     // Pause and dispose video when going back to folders
     _controller?.pause();
     PlaybackManager().updatePlayingState(false);
+    PlaybackManager().setFullVideoActive(false);
     setState(() {
       _isPlaying = false;
       _isInFolderView = true;
@@ -337,30 +410,67 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
-  void _checkPendingVideo() {
+  void _triggerPendingVideo() {
     if (VideoPlayerScreen.pendingVideoToPlay != null) {
       final video = VideoPlayerScreen.pendingVideoToPlay!;
+      final autoFullScreen = VideoPlayerScreen.pendingAutoFullScreen;
+      final openedFromExternal = VideoPlayerScreen.pendingOpenedFromExternal;
       VideoPlayerScreen.pendingVideoToPlay = null;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _playDirectVideo(video);
-      });
+      VideoPlayerScreen.pendingAutoFullScreen = false;
+      VideoPlayerScreen.pendingOpenedFromExternal = false;
+      if (mounted) {
+        _playDirectVideo(
+          video,
+          autoFullScreen: autoFullScreen,
+          openedFromExternal: openedFromExternal,
+        );
+      }
     }
   }
 
-  void _playDirectVideo(MediaItem video) {
-    _currentFolder = null;
+  void _playDirectVideo(
+    MediaItem video, {
+    bool autoFullScreen = false,
+    bool openedFromExternal = false,
+  }) {
+    _launchedFromExternal = openedFromExternal;
+    FolderItem? targetFolder;
+    for (final folder in _folders) {
+      if (folder.mediaFiles.any(
+        (v) => v.id == video.id || v.path == video.path,
+      )) {
+        targetFolder = folder;
+        break;
+      }
+    }
+    if (targetFolder != null) {
+      _currentFolder = targetFolder;
+      _videoList = targetFolder.mediaFiles;
+    } else if (!_videoList.any(
+      (v) => v.id == video.id || v.path == video.path,
+    )) {
+      _videoList = [video];
+      _currentFolder = null;
+    }
     _isInFolderView = false;
-    final existingIdx =
-        _videoList.indexWhere((v) => v.id == video.id || v.path == video.path);
+
+    // Immediately open fullscreen without waiting for async initialization
+    if (autoFullScreen && !_isFullScreen) {
+      _enterFullScreen();
+    }
+
+    final existingIdx = _videoList.indexWhere(
+      (v) => v.id == video.id || v.path == video.path,
+    );
     if (existingIdx != -1) {
-      _playVideo(existingIdx);
+      _playVideo(existingIdx, autoFullScreen: autoFullScreen);
     } else {
       _videoList = [video];
-      _playVideo(0);
+      _playVideo(0, autoFullScreen: autoFullScreen);
     }
   }
 
-  Future<void> _playVideo(int index) async {
+  Future<void> _playVideo(int index, {bool autoFullScreen = false}) async {
     if (index < 0 || index >= _videoList.length) return;
 
     final videoItem = _videoList[index];
@@ -418,16 +528,31 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
         PlaybackManager().updateDuration(_controller!.value.duration);
       });
 
+      // Seek to current saved position if any (from mini player or last position)
+      final savedPos = PlaybackManager().position;
+      if (savedPos > Duration.zero && savedPos < _controller!.value.duration) {
+        await _controller!.seekTo(savedPos);
+      }
+
+      PlaybackManager().setFullVideoActive(true);
       await _controller!.play();
       PlaybackManager().updatePlayingState(true);
       _startPositionUpdateTimer();
+      _fullscreenUpdateNotifier.value++;
       if (mounted) {
-        setState(() {});
-        _startHideControlsTimer();
+        if (autoFullScreen && !_isFullScreen) {
+          _enterFullScreen();
+        } else {
+          setState(() {});
+          _startHideControlsTimer();
+        }
       }
     } catch (e) {
       if (mounted) {
         _showError('Error playing video: $e');
+        if (_isFullScreen) {
+          _exitFullScreen();
+        }
       }
     }
   }
@@ -498,17 +623,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
-    _checkPendingVideo();
+    _triggerPendingVideo();
     return PopScope(
-      canPop: !_isInFolderView, // Allow pop only if not in folder view
-      onPopInvoked: (didPop) async {
-        if (!didPop && _isInFolderView) {
-          // This means we're in folder view and system wants to pop
-          // Just allow normal navigation back (exit app or go to previous screen)
-          return;
-        }
+      canPop: _isInFolderView,
+      onPopInvokedWithResult: (didPop, result) async {
         if (!didPop && !_isInFolderView) {
-          // We're in video list view, go back to folders instead of exiting
           _backToFolders();
         }
       },
@@ -518,7 +637,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             _buildHeader(),
             if (_controller != null &&
                 _controller!.value.isInitialized &&
-                !_isInFolderView)
+                !_isInFolderView &&
+                !_isFullScreen)
               _buildVideoPlayer(),
             Expanded(
               child: _isLoading
@@ -786,6 +906,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   }
 
   Widget _buildPlayerControls({required bool isFullscreen}) {
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return const SizedBox.shrink();
+    }
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -1575,7 +1698,7 @@ class _FullScreenVideoWidgetState extends State<_FullScreenVideoWidget> {
 
     return WillPopScope(
       onWillPop: () async {
-        widget.videoPlayerState._exitFullScreen();
+        widget.videoPlayerState._restorePortraitAfterFullscreen();
         return true;
       },
       child: Scaffold(

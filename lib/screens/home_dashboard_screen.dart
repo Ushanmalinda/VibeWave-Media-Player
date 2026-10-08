@@ -147,15 +147,21 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                 final current = _playbackManager.currentlyPlaying ??
                     _historyService.history.firstOrNull;
                 if (current != null && current.type == MediaType.video) {
-                  VideoPlayerScreen.playExternalVideo(current);
-                  widget.onNavigate?.call(2);
+                  VideoPlayerScreen.playExternalVideo(
+                    current,
+                    autoFullScreen: true,
+                    openedFromExternal: true,
+                  );
                 } else {
                   widget.onNavigate?.call(1);
                 }
               },
               onPlayVideo: (video) {
-                VideoPlayerScreen.playExternalVideo(video);
-                widget.onNavigate?.call(2);
+                VideoPlayerScreen.playExternalVideo(
+                  video,
+                  autoFullScreen: true,
+                  openedFromExternal: true,
+                );
               },
             ),
             const SizedBox(height: 24),
