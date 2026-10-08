@@ -13,6 +13,7 @@ import '../services/media_controls_service.dart';
 import '../services/last_played_service.dart';
 import 'video_player_screen.dart';
 import '../services/queue_service.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 import '../widgets/mini_player.dart';
 
 class HomeDashboardScreen extends StatefulWidget {
@@ -34,6 +35,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   int _favoritesCount = 0;
   MediaItem? _sampleAudioItem;
   MediaItem? _sampleVideoItem;
+  bool _isLoadingMedia = true;
 
   @override
   void initState() {
@@ -42,8 +44,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     _favoritesService.addListener(_onFavoritesChanged);
     _historyService.addListener(_onHistoryChanged);
     _requestPermissionsEarly();
-    // Delay loading counts to improve initial load speed
-    Future.delayed(const Duration(milliseconds: 300), _loadMediaCounts);
+    _loadMediaCounts();
   }
 
   Future<void> _requestPermissionsEarly() async {
@@ -86,10 +87,15 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           _sampleAudioItem = sampleAudio;
           _sampleVideoItem = sampleVideo;
           _favoritesCount = _favoritesService.favoriteIds.length;
+          _isLoadingMedia = false;
         });
       }
     } catch (e) {
-      // Error loading media counts
+      if (mounted) {
+        setState(() {
+          _isLoadingMedia = false;
+        });
+      }
     }
   }
 
@@ -164,6 +170,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                             .where((m) => m.type == MediaType.audio)
                             .firstOrNull ??
                         _sampleAudioItem,
+                    isLoading: _isLoadingMedia,
                     onTap: () => widget.onNavigate?.call(1),
                   ),
                 ),
@@ -179,6 +186,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                             .where((m) => m.type == MediaType.video)
                             .firstOrNull ??
                         _sampleVideoItem,
+                    isLoading: _isLoadingMedia,
                     onTap: () => widget.onNavigate?.call(2),
                   ),
                 ),
@@ -738,6 +746,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     required Color color,
     VoidCallback? onTap,
     MediaItem? backgroundMedia,
+    bool isLoading = false,
   }) {
     return GestureDetector(
       onTap: onTap,
@@ -853,14 +862,37 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                       ),
                     ),
                     const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.65),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
+                    if (isLoading)
+                      SizedBox(
+                        height: 18,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            LoadingAnimationWidget.staggeredDotsWave(
+                              color: color,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              'Scanning...',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.6),
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                    else
+                      Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.65),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

@@ -27,6 +27,13 @@ class MediaScanner {
     '.ogg',
     '.opus',
     '.wma',
+    '.alac',
+    '.aiff',
+    '.mid',
+    '.midi',
+    '.amr',
+    '.m4b',
+    '.m4p',
   ];
 
   static final List<String> _videoExtensions = [
@@ -39,6 +46,11 @@ class MediaScanner {
     '.webm',
     '.m4v',
     '.3gp',
+    '.ts',
+    '.mpg',
+    '.mpeg',
+    '.vob',
+    '.ogv',
   ];
 
   static Future<bool> requestPermissions() async {
