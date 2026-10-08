@@ -733,9 +733,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         await _historyService.addToHistory(item);
         await LastPlayedService.saveLastPlayed(item, 0);
       } catch (e) {
-        // Fallback or navigate
+        // Fallback
       }
-      widget.onNavigate?.call(1);
     } else {
       VideoPlayerScreen.playExternalVideo(item);
       widget.onNavigate?.call(2);
