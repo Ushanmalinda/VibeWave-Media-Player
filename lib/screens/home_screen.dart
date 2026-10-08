@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'home_dashboard_screen.dart';
@@ -269,30 +270,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  String _getTitle() {
-    switch (_selectedDrawerIndex) {
-      case 0:
-        return 'Home';
-      case 1:
-        return 'My Music';
-      case 2:
-        return 'My Videos';
-      case 3:
-        return 'Sound Effects';
-      case 4:
-        return 'Bookmarks';
-      case 5:
-        return 'Favorites';
-      case 6:
-        return 'Queue';
-      case 7:
-        return 'Playlists';
-      case 8:
-        return 'Settings';
-      default:
-        return 'Media Player';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -348,194 +325,23 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         drawerEnableOpenDragGesture: false,
-        appBar: AppBar(
-          leading: Builder(
-            builder: (context) => IconButton(
-              icon: const Icon(Icons.menu_rounded, color: Colors.white),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-            ),
-          ),
-          title:
-              _isSearching &&
-                  (_selectedDrawerIndex == 4 ||
-                      _selectedDrawerIndex == 5 ||
-                      _selectedDrawerIndex == 6 ||
-                      _selectedDrawerIndex == 7)
-              ? TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: _selectedDrawerIndex == 4
-                        ? 'Search bookmarks...'
-                        : _selectedDrawerIndex == 5
-                        ? 'Search favorites...'
-                        : _selectedDrawerIndex == 6
-                        ? 'Search queue...'
-                        : 'Search playlists...',
-                    hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
-                    border: InputBorder.none,
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _searchQuery = value;
-                    });
-                  },
-                )
-              : Text(
-                  _getTitle(),
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
-                ),
-          backgroundColor: const Color(0xFF2a2a2a),
-          elevation: 0,
-          actions: [
-            if (_selectedDrawerIndex == 4 ||
-                _selectedDrawerIndex == 5 ||
-                _selectedDrawerIndex == 6 ||
-                _selectedDrawerIndex == 7)
-              IconButton(
-                icon: Icon(
-                  _isSearching ? Icons.close : Icons.search_rounded,
-                  color: Colors.white,
-                ),
-                onPressed: () {
-                  setState(() {
-                    _isSearching = !_isSearching;
-                    if (!_isSearching) {
-                      _searchController.clear();
-                      _searchQuery = '';
-                    }
-                  });
-                },
-              ),
-            if (_selectedDrawerIndex == 4)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                color: const Color(0xFF2a2a2a),
-                onSelected: (value) {
-                  if (value == 'clear_all') {
-                    _showClearBookmarksDialog(context);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'clear_all',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Clear all bookmarks',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            else if (_selectedDrawerIndex == 5)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                color: const Color(0xFF2a2a2a),
-                onSelected: (value) {
-                  if (value == 'clear_all') {
-                    _showClearFavoritesDialog(context);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'clear_all',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Clear all favorites',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            else if (_selectedDrawerIndex == 6)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                color: const Color(0xFF2a2a2a),
-                onSelected: (value) {
-                  if (value == 'clear_queue') {
-                    _showClearQueueDialog(context);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'clear_queue',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete_outline,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Clear queue',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              )
-            else if (_selectedDrawerIndex == 7)
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
-                color: const Color(0xFF2a2a2a),
-                onSelected: (value) {
-                  if (value == 'delete_all') {
-                    _showDeleteAllPlaylistsDialog(context);
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'delete_all',
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.delete_sweep,
-                          color: Colors.red,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          'Delete all playlists',
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-          ],
+        appBar: _VibeWaveAppBar(
+          selectedIndex: _selectedDrawerIndex,
+          isSearching: _isSearching,
+          searchController: _searchController,
+          searchQuery: _searchQuery,
+          onSearchChanged: (v) => setState(() => _searchQuery = v),
+          onSearchToggle: () => setState(() {
+            _isSearching = !_isSearching;
+            if (!_isSearching) {
+              _searchController.clear();
+              _searchQuery = '';
+            }
+          }),
+          onClearBookmarks: () => _showClearBookmarksDialog(context),
+          onClearFavorites: () => _showClearFavoritesDialog(context),
+          onClearQueue: () => _showClearQueueDialog(context),
+          onDeletePlaylists: () => _showDeleteAllPlaylistsDialog(context),
         ),
         drawer: Drawer(
           backgroundColor: const Color(0xFF1a1a1a),
@@ -738,6 +544,348 @@ class _HomeScreenState extends State<HomeScreen> {
       selectedTileColor: Colors.orange.withOpacity(0.1),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// VibeWave Custom Floating Glass AppBar
+// Modelled after the deptx_app CustomAppBar design:
+//  • Floating pill container with 28px radius
+//  • BackdropFilter blur (glassmorphism) — elevated on scroll
+//  • Home tab: logo + two-line "Welcome to VibeWave" greeting
+//  • Other tabs: centered title + menu button left + action pills right
+//  • Action pills: search / overflow in rounded icon containers
+// ─────────────────────────────────────────────────────────────────────────────
+class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
+  final int selectedIndex;
+  final bool isSearching;
+  final TextEditingController searchController;
+  final String searchQuery;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback onSearchToggle;
+  final VoidCallback onClearBookmarks;
+  final VoidCallback onClearFavorites;
+  final VoidCallback onClearQueue;
+  final VoidCallback onDeletePlaylists;
+
+  // Whether we show the search / overflow actions
+  bool get _hasActions =>
+      selectedIndex == 4 ||
+      selectedIndex == 5 ||
+      selectedIndex == 6 ||
+      selectedIndex == 7;
+
+  const _VibeWaveAppBar({
+    required this.selectedIndex,
+    required this.isSearching,
+    required this.searchController,
+    required this.searchQuery,
+    required this.onSearchChanged,
+    required this.onSearchToggle,
+    required this.onClearBookmarks,
+    required this.onClearFavorites,
+    required this.onClearQueue,
+    required this.onDeletePlaylists,
+  });
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 16);
+
+  String _titleFor(int index) {
+    switch (index) {
+      case 1: return 'My Music';
+      case 2: return 'My Videos';
+      case 3: return 'Sound Effects';
+      case 4: return 'Bookmarks';
+      case 5: return 'Favorites';
+      case 6: return 'Queue';
+      case 7: return 'Playlists';
+      case 8: return 'Settings';
+      default: return 'VibeWave';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final double statusBarHeight = MediaQuery.of(context).padding.top;
+
+    return Padding(
+      padding: EdgeInsets.only(
+        top: statusBarHeight + 4,
+        left: 12,
+        right: 12,
+        bottom: 4,
+      ),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeInOut,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(28),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 18,
+              spreadRadius: 0,
+              offset: const Offset(0, 6),
+            ),
+            BoxShadow(
+              color: Colors.orange.withValues(alpha: 0.06),
+              blurRadius: 6,
+              spreadRadius: 0,
+              offset: const Offset(0, 2),
+            ),
+          ],
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.10),
+            width: 1.2,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(28),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              height: kToolbarHeight - 2,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: selectedIndex == 0 && !isSearching
+                  ? _buildHomeHeader(context)
+                  : _buildStandardHeader(context),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Home tab: logo + Welcome to VibeWave greeting ──
+  Widget _buildHomeHeader(BuildContext context) {
+    return Row(
+      children: [
+        // Menu button
+        Builder(
+          builder: (ctx) => _ActionPill(
+            onTap: () => Scaffold.of(ctx).openDrawer(),
+            child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
+          ),
+        ),
+        const SizedBox(width: 10),
+        // Logo + greeting text
+        Image.asset('assets/images/logo.png', width: 34, height: 34),
+        const SizedBox(width: 10),
+        const Expanded(
+          child: Row(
+            children: [
+              Flexible(
+                child: Text(
+                  'Welcome to VibeWave',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: -0.3,
+                  ),
+                ),
+              ),
+              SizedBox(width: 6),
+              Text('🎵', style: TextStyle(fontSize: 16)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Standard tab: menu left | centered title | action pills right ──
+  Widget _buildStandardHeader(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        // Left: menu button (fixed width for balance)
+        SizedBox(
+          width: 82,
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Builder(
+              builder: (ctx) => _ActionPill(
+                onTap: () => Scaffold.of(ctx).openDrawer(),
+                child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
+              ),
+            ),
+          ),
+        ),
+
+        // Center: search field or title
+        Expanded(
+          child: isSearching && _hasActions
+              ? TextField(
+                  controller: searchController,
+                  autofocus: true,
+                  style: const TextStyle(color: Colors.white, fontSize: 15),
+                  decoration: InputDecoration(
+                    hintText: selectedIndex == 4
+                        ? 'Search bookmarks...'
+                        : selectedIndex == 5
+                        ? 'Search favorites...'
+                        : selectedIndex == 6
+                        ? 'Search queue...'
+                        : 'Search playlists...',
+                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                  onChanged: onSearchChanged,
+                )
+              : Text(
+                  _titleFor(selectedIndex),
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+        ),
+
+        // Right: action pills (fixed width for balance)
+        SizedBox(
+          width: 82,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_hasActions) ...[
+                _ActionPill(
+                  onTap: onSearchToggle,
+                  child: Icon(
+                    isSearching ? Icons.close_rounded : Icons.search_rounded,
+                    color: Colors.white,
+                    size: 19,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              if (_hasActions)
+                _OverflowPill(
+                  selectedIndex: selectedIndex,
+                  onClearBookmarks: onClearBookmarks,
+                  onClearFavorites: onClearFavorites,
+                  onClearQueue: onClearQueue,
+                  onDeletePlaylists: onDeletePlaylists,
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Rounded icon pill button (matches deptx _buildActionPill) ──────────────
+class _ActionPill extends StatelessWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _ActionPill({required this.child, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.10),
+              width: 1,
+            ),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+// ── Overflow action pill (⋮ menu) ────────────────────────────────────────────
+class _OverflowPill extends StatelessWidget {
+  final int selectedIndex;
+  final VoidCallback onClearBookmarks;
+  final VoidCallback onClearFavorites;
+  final VoidCallback onClearQueue;
+  final VoidCallback onDeletePlaylists;
+
+  const _OverflowPill({
+    required this.selectedIndex,
+    required this.onClearBookmarks,
+    required this.onClearFavorites,
+    required this.onClearQueue,
+    required this.onDeletePlaylists,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      padding: EdgeInsets.zero,
+      icon: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.10),
+            width: 1,
+          ),
+        ),
+        child: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 19),
+      ),
+      color: const Color(0xFF2a2a2a),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      onSelected: (value) {
+        switch (value) {
+          case 'clear_bookmarks': onClearBookmarks(); break;
+          case 'clear_favorites': onClearFavorites(); break;
+          case 'clear_queue': onClearQueue(); break;
+          case 'delete_playlists': onDeletePlaylists(); break;
+        }
+      },
+      itemBuilder: (_) {
+        if (selectedIndex == 4) {
+          return [_menuItem('clear_bookmarks', Icons.delete_outline, 'Clear all bookmarks')];
+        } else if (selectedIndex == 5) {
+          return [_menuItem('clear_favorites', Icons.delete_outline, 'Clear all favorites')];
+        } else if (selectedIndex == 6) {
+          return [_menuItem('clear_queue', Icons.delete_outline, 'Clear queue')];
+        } else {
+          return [_menuItem('delete_playlists', Icons.delete_sweep, 'Delete all playlists')];
+        }
+      },
+    );
+  }
+
+  PopupMenuItem<String> _menuItem(String value, IconData icon, String label) {
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, color: Colors.red, size: 20),
+          const SizedBox(width: 12),
+          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.9))),
+        ],
+      ),
     );
   }
 }

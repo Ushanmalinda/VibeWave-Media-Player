@@ -83,44 +83,19 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Welcome section
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.orange.withOpacity(0.3),
-                    Colors.orange.withOpacity(0.1),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
+            // Now Playing section
+            Text(
+              'Now Playing',
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.9),
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Image.asset('assets/images/logo.png', width: 60, height: 60),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Welcome to VibeWave Player',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Your music and video collection at your fingertips',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.8),
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
+            ),
+            const SizedBox(height: 16),
+            MiniPlayer(
+              audioPlayer: AudioPlayerService().player,
+              onTap: () => widget.onNavigate?.call(1),
             ),
             const SizedBox(height: 24),
 
@@ -180,22 +155,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   ),
                 ),
               ],
-            ),
-            const SizedBox(height: 24),
-
-            // Recently played section
-            Text(
-              'Now Playing',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            MiniPlayer(
-              audioPlayer: AudioPlayerService().player,
-              onTap: () => widget.onNavigate?.call(1),
             ),
             const SizedBox(height: 24),
 

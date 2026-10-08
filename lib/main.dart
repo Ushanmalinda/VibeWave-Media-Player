@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'screens/home_screen.dart';
 import 'services/audio_player_service.dart';
 import 'services/media_controls_service.dart';
@@ -8,10 +9,13 @@ import 'services/media_controls_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Initialize Liquid Glass shaders (Apple iOS 26 style)
+  await LiquidGlassWidgets.initialize();
+
   // Optimize for low-end devices
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
-  runApp(const MyApp());
+  runApp(LiquidGlassWidgets.wrap(child: const MyApp()));
 }
 
 class MyApp extends StatefulWidget {

@@ -81,6 +81,9 @@ dependencies:
   url_launcher: ^6.3.3
   audio_metadata_reader: ^1.8.0
 
+  # Liquid Glass UI (Apple iOS 26 style)
+  liquid_glass_widgets: ^1.10.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
