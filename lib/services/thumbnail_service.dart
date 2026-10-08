@@ -3,7 +3,7 @@ import 'dart:typed_data';
 import 'package:get_thumbnail_video/index.dart';
 import 'package:get_thumbnail_video/video_thumbnail.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:audiotags/audiotags.dart';
+import 'package:audio_metadata_reader/audio_metadata_reader.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
 
@@ -25,12 +25,12 @@ class ThumbnailService {
         return null;
       }
 
-      // Read audio tags including artwork
-      final tag = await AudioTags.read(audioPath);
+      // Read audio metadata including artwork
+      final metadata = readMetadata(audioFile, getImage: true);
 
-      if (tag != null && tag.pictures.isNotEmpty) {
+      if (metadata.pictures.isNotEmpty) {
         // Cache and return the first picture (album art)
-        final thumbnail = tag.pictures.first.bytes;
+        final thumbnail = metadata.pictures.first.bytes;
         _audioThumbnailCache[audioPath] = thumbnail;
         return thumbnail;
       }

@@ -97,7 +97,7 @@ class AboutScreen extends StatelessWidget {
                 _buildLibraryItem('sensors_plus', '© 2024 Flutter Community'),
                 _buildLibraryItem('volume_controller', '© 2024 Yosuke Ota'),
                 _buildLibraryItem('file_picker', '© 2024 Miguel Ruivo'),
-                _buildLibraryItem('audiotags', '© 2024 Nikos Beredimas'),
+                _buildLibraryItem('audio_metadata_reader', '© 2024–2026 Arthur Delalandre'),
               ],
             ),
             const SizedBox(height: 32),

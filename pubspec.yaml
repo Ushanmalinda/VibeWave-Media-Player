@@ -62,8 +62,6 @@ dependencies:
   
   # Thumbnail generation
   get_thumbnail_video: ^0.7.3
-  audiotags: ^1.0.1
-  
   # Crypto for hash generation
   crypto: ^3.0.3
   
@@ -81,6 +79,7 @@ dependencies:
   
   # URL launcher for links
   url_launcher: ^6.3.3
+  audio_metadata_reader: ^1.8.0
 
 dev_dependencies:
   flutter_test:
