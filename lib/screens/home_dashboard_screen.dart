@@ -84,14 +84,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Now Playing section
-            Text(
-              'Now Playing',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
             const SizedBox(height: 16),
             MiniPlayer(
               audioPlayer: AudioPlayerService().player,
@@ -100,14 +92,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             const SizedBox(height: 24),
 
             // Quick access section
-            Text(
-              'Quick Access',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -159,14 +143,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
             const SizedBox(height: 24),
 
             // Statistics section
-            Text(
-              'Your Library',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.9),
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
