@@ -1,11 +1,13 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+import 'dart:ui';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
+import '../models/media_item.dart';
 import '../services/playback_manager.dart';
 import '../services/thumbnail_service.dart';
 import '../services/favorites_service.dart';
 import '../services/queue_service.dart';
-import '../models/media_item.dart';
-import 'package:just_audio/just_audio.dart';
 
 class MiniPlayer extends StatefulWidget {
   final VoidCallback onTap;
@@ -134,7 +136,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
+                color: Colors.white.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -167,7 +169,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                       decoration: BoxDecoration(
                         color: isCurrent
                             ? Colors.orange
-                            : Colors.orange.withOpacity(0.2),
+                            : Colors.orange.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Icon(
@@ -191,7 +193,9 @@ class _MiniPlayerState extends State<MiniPlayer> {
                     ),
                     subtitle: Text(
                       item.artist ?? 'Unknown Artist',
-                      style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.6),
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -211,66 +215,88 @@ class _MiniPlayerState extends State<MiniPlayer> {
 
     if (currentItem == null) {
       return Container(
-        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF2a2a2a),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.orange.withOpacity(0.2), width: 1),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.orange.withOpacity(0.3),
-                    Colors.orange.withOpacity(0.1),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.music_note_rounded,
-                color: Colors.orange,
-                size: 28,
-              ),
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 18,
+              offset: const Offset(0, 6),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
+            BoxShadow(
+              color: Colors.orange.withValues(alpha: 0.05),
+              blurRadius: 6,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                  width: 1.2,
+                ),
+              ),
+              child: Row(
                 children: [
-                  const Text(
-                    'No music playing',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                      fontSize: 15,
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.10),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.music_note_rounded,
+                      color: Colors.orange,
+                      size: 26,
                     ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tap to browse your library',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.6),
-                      fontSize: 13,
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'No music playing',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          'Tap to browse your library',
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.55),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
+                  ),
+                  _buildGlassActionBtn(
+                    icon: Icons.library_music_rounded,
+                    iconColor: Colors.orange,
+                    onTap: widget.onTap,
                   ),
                 ],
               ),
             ),
-            IconButton(
-              icon: const Icon(
-                Icons.library_music_rounded,
-                color: Colors.orange,
-              ),
-              iconSize: 28,
-              onPressed: widget.onTap,
-            ),
-          ],
+          ),
         ),
       );
     }
@@ -279,256 +305,385 @@ class _MiniPlayerState extends State<MiniPlayer> {
       onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [const Color(0xFF2a2a2a), const Color(0xFF1f1f1f)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1.2,
           ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.orange.withOpacity(0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
-              color: Colors.orange.withOpacity(0.1),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.40),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+            BoxShadow(
+              color: Colors.orange.withValues(alpha: 0.08),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
           ],
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Main player content
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Row(
-                children: [
-                  // Animated Thumbnail with pulse effect
-                  StreamBuilder<PlayerState>(
-                    stream: widget.audioPlayer.playerStateStream,
-                    builder: (context, snapshot) {
-                      final isPlaying = snapshot.data?.playing ?? false;
-                      return Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          if (isPlaying)
-                            Container(
-                              width: 64,
-                              height: 64,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(12),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.orange.withOpacity(0.4),
-                                    blurRadius: 16,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          _buildThumbnail(currentItem),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            children: [
+              // 1. Current Song Background Image
+              Positioned.fill(
+                child: _buildSongBackground(currentItem),
+              ),
+
+              // 2. Crystal Glass Blur & Tint Overlay (Apple Music frosted glass effect)
+              Positioned.fill(
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          const Color(0xFF141414).withValues(alpha: 0.65),
+                          const Color(0xFF0A0A0A).withValues(alpha: 0.82),
                         ],
-                      );
-                    },
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
                   ),
-                  const SizedBox(width: 14),
-                  // Song info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
+                ),
+              ),
+
+              // 3. Crystal Glass Specular Top Highlight
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.center,
+                    ),
+                  ),
+                ),
+              ),
+
+              // 4. Foreground Player Content
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Main song information & buttons
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
                       children: [
-                        Text(
-                          currentItem.title,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 15,
-                            letterSpacing: 0.2,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                        // Animated Thumbnail with glowing pulse
+                        StreamBuilder<PlayerState>(
+                          stream: widget.audioPlayer.playerStateStream,
+                          builder: (context, snapshot) {
+                            final isPlaying = snapshot.data?.playing ?? false;
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (isPlaying)
+                                  Container(
+                                    width: 62,
+                                    height: 62,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.orange.withValues(alpha: 0.45),
+                                          blurRadius: 16,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                _buildThumbnail(currentItem),
+                              ],
+                            );
+                          },
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.album_rounded,
-                              size: 13,
-                              color: Colors.white.withOpacity(0.5),
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                currentItem.artist ?? 'Unknown Artist',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
+                        const SizedBox(width: 14),
+                        // Song info
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                currentItem.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 15,
+                                  letterSpacing: 0.2,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
+                              const SizedBox(height: 4),
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.album_rounded,
+                                    size: 13,
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Expanded(
+                                    child: Text(
+                                      currentItem.artist ?? 'Unknown Artist',
+                                      style: TextStyle(
+                                        color: Colors.white.withValues(alpha: 0.7),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Action buttons in crystal glass pills
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Mute button
+                            _buildGlassActionBtn(
+                              icon: _isMuted
+                                  ? Icons.volume_off_rounded
+                                  : Icons.volume_up_rounded,
+                              iconColor: _isMuted
+                                  ? Colors.orange
+                                  : Colors.white.withValues(alpha: 0.8),
+                              onTap: _toggleMute,
+                            ),
+                            const SizedBox(width: 6),
+                            // Favorite button
+                            _buildGlassActionBtn(
+                              icon: _favoritesService.isFavorite(currentItem.id)
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              iconColor: _favoritesService.isFavorite(currentItem.id)
+                                  ? Colors.red
+                                  : Colors.white.withValues(alpha: 0.8),
+                              onTap: () => _toggleFavorite(currentItem),
+                            ),
+                            const SizedBox(width: 6),
+                            // Queue button
+                            _buildGlassActionBtn(
+                              icon: Icons.queue_music_rounded,
+                              iconColor: Colors.white.withValues(alpha: 0.8),
+                              onTap: _showQueueDialog,
                             ),
                           ],
                         ),
                       ],
                     ),
                   ),
-                  // Action buttons
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Mute button
-                      IconButton(
-                        icon: Icon(
-                          _isMuted
-                              ? Icons.volume_off_rounded
-                              : Icons.volume_up_rounded,
-                          color: Colors.white.withOpacity(0.7),
-                        ),
-                        iconSize: 22,
-                        onPressed: _toggleMute,
-                      ),
-                      // Favorite button
-                      IconButton(
-                        icon: Icon(
-                          _favoritesService.isFavorite(currentItem.id)
-                              ? Icons.favorite
-                              : Icons.favorite_border,
-                          color: _favoritesService.isFavorite(currentItem.id)
-                              ? Colors.red
-                              : Colors.white.withOpacity(0.7),
-                        ),
-                        iconSize: 22,
-                        onPressed: () => _toggleFavorite(currentItem),
-                      ),
-                      // Queue button
-                      IconButton(
-                        icon: Icon(
-                          Icons.queue_music_rounded,
-                          color: Colors.white.withOpacity(0.7),
-                        ),
-                        iconSize: 22,
-                        onPressed: _showQueueDialog,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            // Progress bar with time
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12),
-              child: StreamBuilder<Duration>(
-                stream: widget.audioPlayer.positionStream,
-                builder: (context, snapshot) {
-                  final position = snapshot.data ?? Duration.zero;
-                  final duration = widget.audioPlayer.duration ?? Duration.zero;
-                  final progress = duration.inMilliseconds > 0
-                      ? position.inMilliseconds / duration.inMilliseconds
-                      : 0.0;
 
-                  return Column(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          backgroundColor: Colors.white.withOpacity(0.1),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.orange.withOpacity(0.9),
-                          ),
-                          minHeight: 4,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            _formatDuration(position),
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Text(
-                            _formatDuration(duration),
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.6),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 8),
-            // Control buttons
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.2),
-                borderRadius: const BorderRadius.only(
-                  bottomLeft: Radius.circular(14),
-                  bottomRight: Radius.circular(14),
-                ),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildControlButton(
-                    icon: Icons.skip_previous_rounded,
-                    onPressed: _skipPrevious,
-                    size: 32,
-                  ),
-                  StreamBuilder<PlayerState>(
-                    stream: widget.audioPlayer.playerStateStream,
-                    builder: (context, snapshot) {
-                      final playerState = snapshot.data;
-                      final isPlaying = playerState?.playing ?? false;
+                  // Progress bar with timestamps
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: StreamBuilder<Duration>(
+                      stream: widget.audioPlayer.positionStream,
+                      builder: (context, snapshot) {
+                        final position = snapshot.data ?? Duration.zero;
+                        final duration =
+                            widget.audioPlayer.duration ?? Duration.zero;
+                        final progress = duration.inMilliseconds > 0
+                            ? position.inMilliseconds / duration.inMilliseconds
+                            : 0.0;
 
-                      return Container(
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [Color(0xFFFF9800), Color(0xFFFF6F00)],
-                          ),
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.orange.withOpacity(0.4),
-                              blurRadius: 8,
-                              spreadRadius: 1,
+                        return Column(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: progress.clamp(0.0, 1.0),
+                                backgroundColor:
+                                    Colors.white.withValues(alpha: 0.12),
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.orange.withValues(alpha: 0.95),
+                                ),
+                                minHeight: 4,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  _formatDuration(position),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                Text(
+                                  _formatDuration(duration),
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.6),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
-                        ),
-                        child: IconButton(
-                          icon: Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                          ),
-                          iconSize: 32,
-                          onPressed: _togglePlayPause,
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
                   ),
-                  _buildControlButton(
-                    icon: Icons.skip_next_rounded,
-                    onPressed: _skipNext,
-                    size: 32,
+
+                  const SizedBox(height: 8),
+
+                  // Bottom controls bar with translucent crystal glass finish
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      borderRadius: const BorderRadius.only(
+                        bottomLeft: Radius.circular(22),
+                        bottomRight: Radius.circular(22),
+                      ),
+                      border: Border(
+                        top: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.06),
+                          width: 1,
+                        ),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildControlButton(
+                          icon: Icons.skip_previous_rounded,
+                          onPressed: _skipPrevious,
+                          size: 32,
+                        ),
+                        StreamBuilder<PlayerState>(
+                          stream: widget.audioPlayer.playerStateStream,
+                          builder: (context, snapshot) {
+                            final playerState = snapshot.data;
+                            final isPlaying = playerState?.playing ?? false;
+
+                            return Container(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFF9800),
+                                    Color(0xFFFF6F00),
+                                  ],
+                                ),
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.orange.withValues(alpha: 0.45),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: Icon(
+                                  isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                ),
+                                iconSize: 32,
+                                onPressed: _togglePlayPause,
+                              ),
+                            );
+                          },
+                        ),
+                        _buildControlButton(
+                          icon: Icons.skip_next_rounded,
+                          onPressed: _skipNext,
+                          size: 32,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSongBackground(MediaItem item) {
+    if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+      return Image.file(
+        File(item.thumbnailPath!),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+      );
+    }
+
+    return FutureBuilder<Uint8List?>(
+      future: ThumbnailService.getAudioThumbnail(item.path),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data != null) {
+          return Image.memory(
+            snapshot.data!,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+          );
+        }
+        // Fallback gradient if song has no album artwork
+        return Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF2E1C0C), Color(0xFF141414)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-          ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildGlassActionBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? iconColor,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.10),
+              width: 1,
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: iconColor ?? Colors.white.withValues(alpha: 0.9),
+            size: 20,
+          ),
         ),
       ),
     );
@@ -540,7 +695,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
     required double size,
   }) {
     return IconButton(
-      icon: Icon(icon, color: Colors.white.withOpacity(0.9)),
+      icon: Icon(icon, color: Colors.white.withValues(alpha: 0.9)),
       iconSize: size,
       onPressed: onPressed,
     );
@@ -557,7 +712,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 borderRadius: BorderRadius.circular(12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
@@ -567,21 +722,21 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 borderRadius: BorderRadius.circular(12),
                 child: Image.memory(
                   snapshot.data!,
-                  width: 60,
-                  height: 60,
+                  width: 58,
+                  height: 58,
                   fit: BoxFit.cover,
                 ),
               ),
             );
           }
           return Container(
-            width: 60,
-            height: 60,
+            width: 58,
+            height: 58,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  Colors.orange.withOpacity(0.4),
-                  Colors.orange.withOpacity(0.2),
+                  Colors.orange.withValues(alpha: 0.4),
+                  Colors.orange.withValues(alpha: 0.2),
                 ],
               ),
               borderRadius: BorderRadius.circular(12),
@@ -596,11 +751,14 @@ class _MiniPlayerState extends State<MiniPlayer> {
       );
     }
     return Container(
-      width: 60,
-      height: 60,
+      width: 58,
+      height: 58,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [Colors.blue.withOpacity(0.4), Colors.blue.withOpacity(0.2)],
+          colors: [
+            Colors.blue.withValues(alpha: 0.4),
+            Colors.blue.withValues(alpha: 0.2),
+          ],
         ),
         borderRadius: BorderRadius.circular(12),
       ),

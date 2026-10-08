@@ -14,6 +14,7 @@ import '../services/controls_manager.dart';
 import '../services/settings_service.dart';
 import '../services/media_controls_service.dart';
 import '../services/last_played_service.dart';
+import '../services/playback_history_service.dart';
 import 'package:volume_controller/volume_controller.dart';
 import 'dart:math';
 import 'dart:typed_data';
@@ -375,8 +376,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
 
       await _audioPlayer.play();
 
-      // Save as last played song
+      // Save as last played song and add to history
       LastPlayedService.saveLastPlayed(media, index, _playlist);
+      PlaybackHistoryService().addToHistory(media);
     } catch (e) {
       _showError('Error playing audio: $e');
     }
@@ -388,8 +390,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
 
     setState(() => _currentIndex = index);
 
-    // Save as last played song
+    // Save as last played song and add to history
     LastPlayedService.saveLastPlayed(_playlist[index], index, _playlist);
+    PlaybackHistoryService().addToHistory(_playlist[index]);
     _playbackManager.updateCurrentlyPlaying(_playlist[index]);
     // Don't call QueueService().setCurrentIndex() here
 

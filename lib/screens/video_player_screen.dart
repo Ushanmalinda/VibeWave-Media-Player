@@ -12,9 +12,16 @@ import '../services/thumbnail_service.dart';
 import '../services/favorites_service.dart';
 import '../services/bookmarks_service.dart';
 import '../services/queue_service.dart';
+import '../services/playback_history_service.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
   const VideoPlayerScreen({super.key});
+
+  static MediaItem? pendingVideoToPlay;
+
+  static void playExternalVideo(MediaItem item) {
+    pendingVideoToPlay = item;
+  }
 
   @override
   State<VideoPlayerScreen> createState() => _VideoPlayerScreenState();
@@ -315,8 +322,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     });
   }
 
+  void _checkPendingVideo() {
+    if (VideoPlayerScreen.pendingVideoToPlay != null) {
+      final video = VideoPlayerScreen.pendingVideoToPlay!;
+      VideoPlayerScreen.pendingVideoToPlay = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _playDirectVideo(video);
+      });
+    }
+  }
+
+  void _playDirectVideo(MediaItem video) {
+    _currentFolder = null;
+    _isInFolderView = false;
+    final existingIdx =
+        _videoList.indexWhere((v) => v.id == video.id || v.path == video.path);
+    if (existingIdx != -1) {
+      _playVideo(existingIdx);
+    } else {
+      _videoList = [video];
+      _playVideo(0);
+    }
+  }
+
   Future<void> _playVideo(int index) async {
     if (index < 0 || index >= _videoList.length) return;
+
+    PlaybackHistoryService().addToHistory(_videoList[index]);
 
     // Properly dispose old controller
     final oldController = _controller;
@@ -433,6 +465,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _checkPendingVideo();
     return PopScope(
       canPop: !_isInFolderView, // Allow pop only if not in folder view
       onPopInvoked: (didPop) async {
