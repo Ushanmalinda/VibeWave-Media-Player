@@ -767,7 +767,6 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
         final isPlaying = index == _currentIndex;
         return Container(
           decoration: BoxDecoration(
-            color: isPlaying ? Colors.orange.withOpacity(0.15) : null,
             border: Border(
               left: BorderSide(
                 color: isPlaying ? Colors.orange : Colors.transparent,
@@ -775,7 +774,9 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
               ),
             ),
           ),
-          child: ListTile(
+          child: Material(
+            color: isPlaying ? Colors.orange.withValues(alpha: 0.15) : Colors.transparent,
+            child: ListTile(
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: AudioThumbnail(
@@ -908,7 +909,8 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
             ),
             onTap: () => _playAudio(index),
           ),
-        );
+        ),
+      );
       },
     );
   }

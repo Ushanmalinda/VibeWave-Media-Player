@@ -444,101 +444,104 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               ),
             ),
 
-            // 4. Foreground content ListTile
-            ListTile(
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 6,
-              ),
-              leading: _buildHistoryThumbnail(item),
-              title: Text(
-                item.title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14.5,
-                  letterSpacing: 0.2,
+            // 4. Foreground content ListTile wrapped in Material for ripple / ink splashes
+            Material(
+              color: Colors.transparent,
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 6,
                 ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 2,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isAudio
-                            ? Colors.orange.withValues(alpha: 0.22)
-                            : Colors.blue.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(5),
-                        border: Border.all(
-                          color: (isAudio ? Colors.orange : Colors.blue)
-                              .withValues(alpha: 0.35),
-                          width: 0.8,
+                leading: _buildHistoryThumbnail(item),
+                title: Text(
+                  item.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14.5,
+                    letterSpacing: 0.2,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                subtitle: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            isAudio
-                                ? Icons.music_note_rounded
-                                : Icons.videocam_rounded,
-                            color: isAudio ? Colors.orange : Colors.blue,
-                            size: 11,
+                        decoration: BoxDecoration(
+                          color: isAudio
+                              ? Colors.orange.withValues(alpha: 0.22)
+                              : Colors.blue.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(
+                            color: (isAudio ? Colors.orange : Colors.blue)
+                                .withValues(alpha: 0.35),
+                            width: 0.8,
                           ),
-                          const SizedBox(width: 3),
-                          Text(
-                            isAudio ? 'SONG' : 'VIDEO',
-                            style: TextStyle(
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isAudio
+                                  ? Icons.music_note_rounded
+                                  : Icons.videocam_rounded,
                               color: isAudio ? Colors.orange : Colors.blue,
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.6,
+                              size: 11,
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        item.artist ?? (isAudio ? 'Audio track' : 'Video file'),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.65),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
+                            const SizedBox(width: 3),
+                            Text(
+                              isAudio ? 'SONG' : 'VIDEO',
+                              style: TextStyle(
+                                color: isAudio ? Colors.orange : Colors.blue,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.6,
+                              ),
+                            ),
+                          ],
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                  ],
-                ),
-              ),
-              trailing: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.12),
-                    width: 1,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.artist ?? (isAudio ? 'Audio track' : 'Video file'),
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.65),
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: const Icon(
-                  Icons.play_arrow_rounded,
-                  color: Colors.white,
-                  size: 22,
+                trailing: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.play_arrow_rounded,
+                    color: Colors.white,
+                    size: 22,
+                  ),
                 ),
+                onTap: () => _playHistoryItem(item),
               ),
-              onTap: () => _playHistoryItem(item),
             ),
           ],
         ),

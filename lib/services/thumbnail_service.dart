@@ -79,32 +79,89 @@ class ThumbnailService {
     }
   }
 
-  static Future<String?> getVideoThumbnail(String videoPath) async {
-    try {
-      final tempDir = await getTemporaryDirectory();
-      final fileName = videoPath
-          .split('/')
-          .last
-          .replaceAll(RegExp(r'[^\w\s]+'), '_');
-      final thumbnailPath = '${tempDir.path}/thumb_$fileName.jpg';
+  // Cache for video thumbnails to prevent repeated JNI decoding attempts
+  static final Map<String, String?> _videoThumbnailCache = {};
+  static final Map<String, Future<String?>> _videoThumbnailInFlight = {};
 
-      // Check if thumbnail already exists
+  static Future<String?> getVideoThumbnail(String videoPath) async {
+    // Return cached thumbnail path (even if null) to avoid spamming native decoders
+    if (_videoThumbnailCache.containsKey(videoPath)) {
+      return _videoThumbnailCache[videoPath];
+    }
+
+    // Reuse in-flight request if already loading
+    if (_videoThumbnailInFlight.containsKey(videoPath)) {
+      return _videoThumbnailInFlight[videoPath]!;
+    }
+
+    final future = _generateVideoThumbnail(videoPath);
+    _videoThumbnailInFlight[videoPath] = future;
+
+    try {
+      final result = await future;
+      _videoThumbnailCache[videoPath] = result;
+      return result;
+    } catch (_) {
+      _videoThumbnailCache[videoPath] = null;
+      return null;
+    } finally {
+      _videoThumbnailInFlight.remove(videoPath);
+    }
+  }
+
+  static Future<String?> _generateVideoThumbnail(String videoPath) async {
+    try {
+      final videoFile = File(videoPath);
+      if (!await videoFile.exists()) {
+        return null;
+      }
+
+      final hash = md5.convert(utf8.encode(videoPath)).toString();
+      final tempDir = await getTemporaryDirectory();
+      final thumbnailPath = '${tempDir.path}/thumb_$hash.jpg';
+
+      // Check if thumbnail already exists on disk
       if (await File(thumbnailPath).exists()) {
         return thumbnailPath;
       }
 
-      // Generate thumbnail
-      final thumbnail = await VideoThumbnail.thumbnailFile(
-        video: videoPath,
-        thumbnailPath: thumbnailPath,
-        imageFormat: ImageFormat.JPEG,
-        maxWidth: 200,
-        quality: 75,
-      );
+      // Generate thumbnail - try at 1000ms (1s) first to avoid missing keyframe at 0ms
+      XFile? thumbnail;
+      try {
+        thumbnail = await VideoThumbnail.thumbnailFile(
+          video: videoPath,
+          thumbnailPath: thumbnailPath,
+          imageFormat: ImageFormat.JPEG,
+          maxWidth: 200,
+          quality: 75,
+          timeMs: 1000,
+        );
+      } catch (_) {
+        thumbnail = null;
+      }
 
-      return thumbnail.path;
+      // Fallback to 0ms if 1000ms didn't produce a file
+      if (thumbnail == null || !await File(thumbnail.path).exists()) {
+        try {
+          thumbnail = await VideoThumbnail.thumbnailFile(
+            video: videoPath,
+            thumbnailPath: thumbnailPath,
+            imageFormat: ImageFormat.JPEG,
+            maxWidth: 200,
+            quality: 75,
+            timeMs: 0,
+          );
+        } catch (_) {
+          thumbnail = null;
+        }
+      }
+
+      if (thumbnail != null && await File(thumbnail.path).exists()) {
+        return thumbnail.path;
+      }
+      return null;
     } catch (e) {
-      // Silently handle errors - some files may have corrupted metadata
+      // Silently handle errors - some files may have corrupted metadata or unsupported codecs
       return null;
     }
   }
