@@ -14,8 +14,8 @@ class MediaScanner {
   static bool? _hasPermissions;
   static List<FolderItem>? _cachedAudioFolders;
   static List<FolderItem>? _cachedVideoFolders;
-  static const String _audioCacheKey = 'cached_audio_folders';
-  static const String _videoCacheKey = 'cached_video_folders';
+  static const String _audioCacheKey = 'cached_audio_folders_v3';
+  static const String _videoCacheKey = 'cached_video_folders_v3';
   static const String _lastScanTimeKey = 'last_scan_time';
 
   static final List<String> _audioExtensions = [
@@ -162,6 +162,10 @@ class MediaScanner {
     _cachedAudioFolders = null;
     _cachedVideoFolders = null;
     final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('cached_audio_folders');
+    await prefs.remove('cached_video_folders');
+    await prefs.remove('cached_audio_folders_v2');
+    await prefs.remove('cached_video_folders_v2');
     await prefs.remove(_audioCacheKey);
     await prefs.remove(_videoCacheKey);
     await prefs.remove(_lastScanTimeKey);
@@ -201,7 +205,7 @@ class MediaScanner {
       if (jsonString == null) return null;
 
       final List<dynamic> jsonData = json.decode(jsonString);
-      return jsonData
+      final folders = jsonData
           .map(
             (folderJson) => FolderItem(
               name: folderJson['name'] as String,
@@ -212,14 +216,37 @@ class MediaScanner {
             ),
           )
           .toList();
+
+      // Deduplicate files inside each folder in case old cache had duplicates
+      for (var folder in folders) {
+        final seenInFolder = <String>{};
+        folder.mediaFiles.removeWhere((item) => !seenInFolder.add(item.path));
+      }
+
+      return folders.where((folder) => folder.fileCount > 0).toList();
     } catch (e) {
       // If cache is corrupted, return null to trigger rescan
       return null;
     }
   }
 
+  static String _getCanonicalPath(String rawPath) {
+    try {
+      return File(rawPath).resolveSymbolicLinksSync();
+    } catch (_) {
+      try {
+        return Directory(rawPath).resolveSymbolicLinksSync();
+      } catch (_) {
+        return p.canonicalize(rawPath);
+      }
+    }
+  }
+
   static Future<List<FolderItem>> _scanMediaFiles(MediaType type) async {
     final Map<String, List<MediaItem>> folderMap = {};
+    final Set<String> seenFilePaths = {};
+    final Set<String> visitedDirs = {};
+
     final extensions = type == MediaType.audio
         ? _audioExtensions
         : _videoExtensions;
@@ -228,7 +255,14 @@ class MediaScanner {
       final directories = await _getMediaDirectories();
       for (var dir in directories) {
         if (await dir.exists()) {
-          await _scanDirectory(dir, folderMap, extensions, type);
+          await _scanDirectory(
+            dir,
+            folderMap,
+            seenFilePaths,
+            visitedDirs,
+            extensions,
+            type,
+          );
         }
       }
     } catch (e) {
@@ -253,7 +287,15 @@ class MediaScanner {
   }
 
   static Future<List<Directory>> _getMediaDirectories() async {
+    final Set<String> uniquePaths = {};
     final List<Directory> directories = [];
+
+    void addDir(String path) {
+      final canonical = _getCanonicalPath(path);
+      if (uniquePaths.add(canonical)) {
+        directories.add(Directory(canonical));
+      }
+    }
 
     if (Platform.isAndroid) {
       // Get all storage paths from native Android code
@@ -264,40 +306,35 @@ class MediaScanner {
 
         for (var storagePath in storagePaths) {
           final path = storagePath.toString();
-
           final storage = Directory(path);
           if (await storage.exists()) {
             // Add common media directories for each storage volume
-            directories.addAll([
-              Directory('$path/Music'),
-              Directory('$path/Download'),
-              Directory('$path/Downloads'),
-              Directory('$path/Movies'),
-              Directory('$path/DCIM'),
-              Directory('$path/Video'),
-              Directory('$path/Videos'),
-              Directory('$path/Audio'),
-              Directory('$path/Podcasts'),
-              storage, // Root of storage
-            ]);
+            addDir('$path/Music');
+            addDir('$path/Download');
+            addDir('$path/Downloads');
+            addDir('$path/Movies');
+            addDir('$path/DCIM');
+            addDir('$path/Video');
+            addDir('$path/Videos');
+            addDir('$path/Audio');
+            addDir('$path/Podcasts');
+            addDir(path); // Root of storage volume
           }
         }
       } catch (e) {
         // Fallback to default internal storage if native method fails
         final externalStorage = Directory('/storage/emulated/0');
         if (await externalStorage.exists()) {
-          directories.addAll([
-            Directory('${externalStorage.path}/Music'),
-            Directory('${externalStorage.path}/Download'),
-            Directory('${externalStorage.path}/Downloads'),
-            Directory('${externalStorage.path}/Movies'),
-            Directory('${externalStorage.path}/DCIM'),
-            Directory('${externalStorage.path}/Video'),
-            Directory('${externalStorage.path}/Videos'),
-            Directory('${externalStorage.path}/Audio'),
-            Directory('${externalStorage.path}/Podcasts'),
-            externalStorage,
-          ]);
+          addDir('${externalStorage.path}/Music');
+          addDir('${externalStorage.path}/Download');
+          addDir('${externalStorage.path}/Downloads');
+          addDir('${externalStorage.path}/Movies');
+          addDir('${externalStorage.path}/DCIM');
+          addDir('${externalStorage.path}/Video');
+          addDir('${externalStorage.path}/Videos');
+          addDir('${externalStorage.path}/Audio');
+          addDir('${externalStorage.path}/Podcasts');
+          addDir(externalStorage.path);
         }
       }
     }
@@ -307,48 +344,73 @@ class MediaScanner {
   static Future<void> _scanDirectory(
     Directory dir,
     Map<String, List<MediaItem>> folderMap,
+    Set<String> seenFilePaths,
+    Set<String> visitedDirs,
     List<String> extensions,
     MediaType type,
   ) async {
+    final canonicalDirPath = _getCanonicalPath(dir.path);
+    if (!visitedDirs.add(canonicalDirPath)) {
+      return; // Already visited this directory
+    }
+
     try {
       await for (var entity in dir.list(recursive: false, followLinks: false)) {
         if (entity is File) {
           final ext = p.extension(entity.path).toLowerCase();
           if (extensions.contains(ext)) {
-            final folderPath = p.dirname(entity.path);
-            final title = p.basenameWithoutExtension(entity.path);
+            final canonicalFilePath = _getCanonicalPath(entity.path);
+            if (!seenFilePaths.add(canonicalFilePath)) {
+              continue; // Already processed this file
+            }
+
+            final folderPath = p.normalize(p.dirname(canonicalFilePath));
+            final title = p.basenameWithoutExtension(canonicalFilePath);
 
             // Generate thumbnail path based on media type
             String? thumbnailPath;
             if (type == MediaType.audio) {
               thumbnailPath = await ThumbnailService.getAudioThumbnailPath(
-                entity.path,
+                canonicalFilePath,
               );
             } else {
               thumbnailPath = await ThumbnailService.getVideoThumbnail(
-                entity.path,
+                canonicalFilePath,
               );
             }
 
             final mediaItem = MediaItem(
-              id: entity.path,
+              id: canonicalFilePath,
               title: title,
-              path: entity.path,
+              path: canonicalFilePath,
               type: type,
-              artist: _extractArtistFromPath(entity.path),
+              artist: _extractArtistFromPath(canonicalFilePath),
               album: p.basename(folderPath),
               thumbnailPath: thumbnailPath,
             );
 
             folderMap.putIfAbsent(folderPath, () => []);
-            folderMap[folderPath]!.add(mediaItem);
+            if (!folderMap[folderPath]!.any((item) => item.path == canonicalFilePath)) {
+              folderMap[folderPath]!.add(mediaItem);
+            }
           }
         } else if (entity is Directory) {
+          final canonicalSubdir = _getCanonicalPath(entity.path);
+          if (visitedDirs.contains(canonicalSubdir)) {
+            continue; // Already scanned or queued
+          }
           final dirName = p.basename(entity.path).toLowerCase();
           if (!dirName.startsWith('.') &&
               dirName != 'android' &&
               dirName != 'data') {
-            await _scanDirectory(entity, folderMap, extensions, type);
+            await _scanDirectory(
+              entity,
+              folderMap,
+              seenFilePaths,
+              visitedDirs,
+              extensions,
+              type,
+            );
           }
         }
       }
@@ -360,7 +422,7 @@ class MediaScanner {
   }
 
   static String _extractArtistFromPath(String path) {
-    final parts = path.split('/');
+    final parts = path.replaceAll(r'\', '/').split('/');
     if (parts.length >= 3) {
       final musicIndex = parts.indexWhere(
         (p) => p.toLowerCase() == 'music' || p.toLowerCase() == 'audio',

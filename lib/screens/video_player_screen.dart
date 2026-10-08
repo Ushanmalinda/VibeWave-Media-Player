@@ -289,14 +289,24 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     );
   }
 
-  Future<void> _scanMediaFiles() async {
+  Future<void> _scanMediaFiles({bool forceRescan = false}) async {
     setState(() => _isLoading = true);
     try {
-      final folders = await MediaScanner.scanVideoFiles();
+      final folders = await MediaScanner.scanVideoFiles(
+        forceRescan: forceRescan,
+      );
       setState(() {
         _folders = folders;
         _isLoading = false;
       });
+      if (forceRescan && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Video library refreshed'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('Error scanning files: $e');
@@ -500,7 +510,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
             ? null
             : FloatingActionButton(
                 heroTag: 'video_player_fab',
-                onPressed: _scanMediaFiles,
+                onPressed: () => _scanMediaFiles(forceRescan: true),
                 child: const Icon(Icons.refresh),
               ),
       ),

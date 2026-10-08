@@ -1,5 +1,6 @@
 package com.example.media_player_app
 
+import java.io.File
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -621,6 +622,12 @@ class MainActivity : AudioServiceActivity() {
             paths.add("/storage/emulated/0")
         }
         
-        return paths
+        return paths.mapNotNull { path ->
+            try {
+                File(path).canonicalPath
+            } catch (e: Exception) {
+                path
+            }
+        }.distinct()
     }
 }
