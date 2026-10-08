@@ -1,8 +1,10 @@
 import 'dart:io';
 import 'dart:ui';
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:video_player/video_player.dart';
 import '../models/media_item.dart';
 import '../services/playback_manager.dart';
 import '../services/thumbnail_service.dart';
@@ -33,16 +35,42 @@ class _MiniPlayerState extends State<MiniPlayer> {
   final PlaybackHistoryService _historyService = PlaybackHistoryService();
   bool _isMuted = false;
 
+  // Video controller & state for mini video playback on dashboard
+  VideoPlayerController? _videoController;
+  String? _currentVideoPath;
+  bool _isVideoInitialized = false;
+  bool _showVideoControls = true;
+  Timer? _hideVideoControlsTimer;
+  StreamSubscription<bool>? _audioPlayingSubscription;
+
   @override
   void initState() {
     super.initState();
     _playbackManager.addListener(_onPlaybackChanged);
     _favoritesService.addListener(_onFavoritesChanged);
     _historyService.addListener(_onHistoryChanged);
+
+    // Auto-pause video if audio playback starts
+    _audioPlayingSubscription =
+        widget.audioPlayer.playingStream.listen((playing) {
+      if (playing && _videoController?.value.isPlaying == true) {
+        _videoController?.pause();
+        if (mounted) setState(() {});
+      }
+    });
+
+    // Initialize video controller if initial item is a video
+    final initial = _playbackManager.currentlyPlaying ??
+        _historyService.history.firstOrNull;
+    if (initial != null && initial.type == MediaType.video) {
+      _initVideoController(initial.path, autoPlay: _playbackManager.isPlaying);
+    }
   }
 
   @override
   void dispose() {
+    _disposeVideoController();
+    _audioPlayingSubscription?.cancel();
     _playbackManager.removeListener(_onPlaybackChanged);
     _favoritesService.removeListener(_onFavoritesChanged);
     _historyService.removeListener(_onHistoryChanged);
@@ -50,20 +78,176 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   void _onPlaybackChanged() {
-    if (mounted) {
-      setState(() {});
+    if (!mounted) return;
+    final current = _playbackManager.currentlyPlaying ??
+        _historyService.history.firstOrNull;
+    if (current != null && current.type == MediaType.video) {
+      if (_currentVideoPath != current.path) {
+        _initVideoController(current.path, autoPlay: _playbackManager.isPlaying);
+      }
+    } else {
+      if (_videoController != null) {
+        _disposeVideoController();
+      }
     }
+    setState(() {});
   }
 
   void _onHistoryChanged() {
-    if (mounted) {
+    if (!mounted) return;
+    final current = _playbackManager.currentlyPlaying ??
+        _historyService.history.firstOrNull;
+    if (current != null && current.type == MediaType.video) {
+      if (_currentVideoPath != current.path) {
+        _initVideoController(current.path);
+      }
+    }
+    setState(() {});
+  }
+
+  void _onFavoritesChanged() {
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _initVideoController(String path, {bool autoPlay = false}) async {
+    if (_currentVideoPath == path && _videoController != null) {
+      if (autoPlay && !_videoController!.value.isPlaying) {
+        if (widget.audioPlayer.playing) {
+          await widget.audioPlayer.pause();
+        }
+        await _videoController!.play();
+        _playbackManager.updatePlayingState(true);
+        _startHideVideoControlsTimer();
+        if (mounted) setState(() {});
+      }
+      return;
+    }
+
+    _currentVideoPath = path;
+    final old = _videoController;
+    _videoController = null;
+    _isVideoInitialized = false;
+    await old?.pause();
+    await old?.dispose();
+
+    try {
+      final controller = VideoPlayerController.file(
+        File(path),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: false),
+      );
+      _videoController = controller;
+      await controller.initialize();
+
+      if (!mounted || _currentVideoPath != path) {
+        await controller.dispose();
+        return;
+      }
+
+      await controller.setVolume(_isMuted ? 0.0 : 1.0);
+
+      // Seek to saved position if valid
+      final savedPos = _playbackManager.position;
+      if (savedPos > Duration.zero && savedPos < controller.value.duration) {
+        await controller.seekTo(savedPos);
+      }
+
+      controller.addListener(_onVideoTick);
+
+      if (autoPlay) {
+        if (widget.audioPlayer.playing) {
+          await widget.audioPlayer.pause();
+        }
+        await controller.play();
+        _playbackManager.updatePlayingState(true);
+        _startHideVideoControlsTimer();
+      }
+
+      if (mounted) {
+        setState(() {
+          _isVideoInitialized = true;
+        });
+      }
+    } catch (_) {
+      _isVideoInitialized = false;
+      if (mounted) setState(() {});
+    }
+  }
+
+  void _onVideoTick() {
+    if (!mounted || _videoController == null) return;
+    final isPlaying = _videoController!.value.isPlaying;
+    final pos = _videoController!.value.position;
+    final dur = _videoController!.value.duration;
+
+    if (_playbackManager.isPlaying != isPlaying) {
+      _playbackManager.updatePlayingState(isPlaying);
+    }
+    _playbackManager.updatePosition(pos);
+    _playbackManager.updateDuration(dur);
+    if (mounted) setState(() {});
+  }
+
+  void _disposeVideoController() {
+    _hideVideoControlsTimer?.cancel();
+    _currentVideoPath = null;
+    _isVideoInitialized = false;
+    final c = _videoController;
+    _videoController = null;
+    c?.removeListener(_onVideoTick);
+    c?.pause();
+    c?.dispose();
+  }
+
+  void _startHideVideoControlsTimer() {
+    _hideVideoControlsTimer?.cancel();
+    _hideVideoControlsTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _videoController?.value.isPlaying == true) {
+        setState(() => _showVideoControls = false);
+      }
+    });
+  }
+
+  Future<void> _toggleVideoPlayPause() async {
+    final current = _playbackManager.currentlyPlaying ??
+        _historyService.history.firstOrNull;
+    if (current == null) return;
+
+    if (_videoController == null || !_videoController!.value.isInitialized) {
+      await _initVideoController(current.path, autoPlay: true);
+      return;
+    }
+
+    if (_videoController!.value.isPlaying) {
+      await _videoController!.pause();
+      _playbackManager.updatePlayingState(false);
+      _hideVideoControlsTimer?.cancel();
+      setState(() => _showVideoControls = true);
+    } else {
+      if (widget.audioPlayer.playing) {
+        await widget.audioPlayer.pause();
+      }
+      await _videoController!.play();
+      _playbackManager.updatePlayingState(true);
+      _startHideVideoControlsTimer();
       setState(() {});
     }
   }
 
-  void _onFavoritesChanged() {
-    if (mounted) {
-      setState(() {});
+  Future<void> _toggleVideoMute() async {
+    setState(() => _isMuted = !_isMuted);
+    await _videoController?.setVolume(_isMuted ? 0.0 : 1.0);
+  }
+
+  void _openFullVideo(MediaItem item) {
+    if (_videoController != null && _videoController!.value.isInitialized) {
+      _playbackManager.updatePosition(_videoController!.value.position);
+      _playbackManager.updateDuration(_videoController!.value.duration);
+      _videoController!.pause();
+    }
+    if (widget.onPlayVideo != null) {
+      widget.onPlayVideo!(item);
+    } else {
+      widget.onTap();
     }
   }
 
@@ -133,55 +317,48 @@ class _MiniPlayerState extends State<MiniPlayer> {
     }
   }
 
-  void _handlePlayVideo(MediaItem item) {
-    if (widget.onPlayVideo != null) {
-      widget.onPlayVideo!(item);
-    } else {
-      widget.onTap();
-    }
-  }
 
-  void _skipPreviousVideo() {
+  Future<void> _skipPreviousVideo() async {
     final videoHistory = _historyService.history
         .where((m) => m.type == MediaType.video)
         .toList();
-    final current = _playbackManager.currentlyPlaying;
+    final current = _playbackManager.currentlyPlaying ??
+        _historyService.history.firstOrNull;
     if (current != null && videoHistory.isNotEmpty) {
       final idx = videoHistory.indexWhere(
         (m) => m.id == current.id || m.path == current.path,
       );
       if (idx > 0) {
         final prev = videoHistory[idx - 1];
-        _handlePlayVideo(prev);
+        _playbackManager.updateCurrentlyPlaying(prev);
+        await _initVideoController(prev.path, autoPlay: true);
         return;
       }
     }
     if (current != null) {
-      _handlePlayVideo(current);
-    } else {
-      widget.onTap();
+      await _initVideoController(current.path, autoPlay: true);
     }
   }
 
-  void _skipNextVideo() {
+  Future<void> _skipNextVideo() async {
     final videoHistory = _historyService.history
         .where((m) => m.type == MediaType.video)
         .toList();
-    final current = _playbackManager.currentlyPlaying;
+    final current = _playbackManager.currentlyPlaying ??
+        _historyService.history.firstOrNull;
     if (current != null && videoHistory.isNotEmpty) {
       final idx = videoHistory.indexWhere(
         (m) => m.id == current.id || m.path == current.path,
       );
       if (idx >= 0 && idx < videoHistory.length - 1) {
         final next = videoHistory[idx + 1];
-        _handlePlayVideo(next);
+        _playbackManager.updateCurrentlyPlaying(next);
+        await _initVideoController(next.path, autoPlay: true);
         return;
       }
     }
     if (current != null) {
-      _handlePlayVideo(current);
-    } else {
-      widget.onTap();
+      await _initVideoController(current.path, autoPlay: true);
     }
   }
 
@@ -283,104 +460,493 @@ class _MiniPlayerState extends State<MiniPlayer> {
         _historyService.history.firstOrNull;
 
     if (currentItem == null) {
-      return Container(
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 18,
-              offset: const Offset(0, 6),
+      return _buildNoMediaCard();
+    }
+
+    if (currentItem.type == MediaType.video) {
+      return _buildMiniVideoPlayer(currentItem);
+    }
+
+    return _buildMiniAudioPlayer(currentItem);
+  }
+
+  Widget _buildNoMediaCard() {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.orange.withValues(alpha: 0.05),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 1.2,
+              ),
             ),
-            BoxShadow(
-              color: Colors.orange.withValues(alpha: 0.05),
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(22),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.12),
-                  width: 1.2,
+            child: Row(
+              children: [
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.10),
+                      width: 1,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.play_circle_outline_rounded,
+                    color: Colors.orange,
+                    size: 26,
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        width: 1,
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'No media playing',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 15,
+                        ),
                       ),
-                    ),
-                    child: const Icon(
-                      Icons.play_circle_outline_rounded,
-                      color: Colors.orange,
-                      size: 26,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'No media playing',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontSize: 15,
-                          ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'Tap to browse your library',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.55),
+                          fontSize: 12,
                         ),
-                        const SizedBox(height: 3),
-                        Text(
-                          'Tap to browse your library',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.55),
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
-                  _buildGlassActionBtn(
-                    icon: Icons.library_music_rounded,
-                    iconColor: Colors.orange,
-                    onTap: widget.onTap,
-                  ),
-                ],
-              ),
+                ),
+                _buildGlassActionBtn(
+                  icon: Icons.library_music_rounded,
+                  iconColor: Colors.orange,
+                  onTap: widget.onTap,
+                ),
+              ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildMiniVideoPlayer(MediaItem item) {
+    final isInitialized = _isVideoInitialized &&
+        _videoController != null &&
+        _videoController!.value.isInitialized;
+    final isPlaying = isInitialized && _videoController!.value.isPlaying;
+    final position = isInitialized
+        ? _videoController!.value.position
+        : _playbackManager.position;
+    final duration = isInitialized
+        ? _videoController!.value.duration
+        : _playbackManager.duration;
+    final progress = duration.inMilliseconds > 0
+        ? position.inMilliseconds / duration.inMilliseconds
+        : 0.0;
+
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.16),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.50),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+          BoxShadow(
+            color: Colors.blue.withValues(alpha: 0.14),
+            blurRadius: 12,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: AspectRatio(
+          aspectRatio: 16 / 9,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 1. Video Player Viewport or Large Thumbnail Preview
+              Container(
+                color: Colors.black,
+                child: isInitialized
+                    ? Center(
+                        child: AspectRatio(
+                          aspectRatio: _videoController!.value.aspectRatio,
+                          child: VideoPlayer(_videoController!),
+                        ),
+                      )
+                    : _buildVideoLargePreview(item),
+              ),
+
+              // 2. Tap to toggle controls / double tap to play/pause
+              GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  setState(() {
+                    _showVideoControls = !_showVideoControls;
+                  });
+                  if (_showVideoControls && isPlaying) {
+                    _startHideVideoControlsTimer();
+                  }
+                },
+                onDoubleTap: _toggleVideoPlayPause,
+                child: Container(color: Colors.transparent),
+              ),
+
+              // 3. Center Play/Pause button (visible when paused or when controls active)
+              if (!isPlaying || _showVideoControls)
+                Center(
+                  child: GestureDetector(
+                    onTap: _toggleVideoPlayPause,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(30),
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                        child: Container(
+                          width: 54,
+                          height: 54,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.black.withValues(alpha: 0.50),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.30),
+                              width: 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.blue.withValues(alpha: 0.40),
+                                blurRadius: 14,
+                                spreadRadius: 1,
+                              ),
+                            ],
+                          ),
+                          child: Icon(
+                            isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            color: Colors.white,
+                            size: 34,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+              // 4. Top Header Overlay
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                top: (_showVideoControls || !isPlaying) ? 0 : -65,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.black.withValues(alpha: 0.85),
+                        Colors.black.withValues(alpha: 0.40),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      // Video Pill Badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 7,
+                          vertical: 2.5,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: Colors.blue.withValues(alpha: 0.55),
+                            width: 0.8,
+                          ),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.videocam_rounded,
+                              color: Colors.blue,
+                              size: 11,
+                            ),
+                            SizedBox(width: 3),
+                            Text(
+                              'VIDEO',
+                              style: TextStyle(
+                                color: Colors.blue,
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Title
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            shadows: [
+                              Shadow(color: Colors.black, blurRadius: 4),
+                            ],
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Open fullscreen in video player screen
+                      _buildGlassActionBtn(
+                        icon: Icons.fullscreen_rounded,
+                        iconColor: Colors.white,
+                        onTap: () => _openFullVideo(item),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 5. Bottom Controls Overlay
+              AnimatedPositioned(
+                duration: const Duration(milliseconds: 250),
+                bottom: (_showVideoControls || !isPlaying) ? 0 : -75,
+                left: 0,
+                right: 0,
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(10, 6, 10, 6),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.transparent,
+                        Colors.black.withValues(alpha: 0.65),
+                        Colors.black.withValues(alpha: 0.92),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Scrubber progress slider & timestamps
+                      Row(
+                        children: [
+                          Text(
+                            _formatDuration(position),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              shadows: [
+                                Shadow(color: Colors.black, blurRadius: 2),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                trackHeight: 2.5,
+                                thumbShape: const RoundSliderThumbShape(
+                                  enabledThumbRadius: 5,
+                                ),
+                                overlayShape: const RoundSliderOverlayShape(
+                                  overlayRadius: 10,
+                                ),
+                                activeTrackColor: Colors.blue,
+                                inactiveTrackColor:
+                                    Colors.white.withValues(alpha: 0.25),
+                                thumbColor: Colors.white,
+                              ),
+                              child: Slider(
+                                value: progress.clamp(0.0, 1.0),
+                                onChanged: (val) {
+                                  if (_videoController != null &&
+                                      _videoController!.value.isInitialized) {
+                                    final target = Duration(
+                                      milliseconds: (val *
+                                              _videoController!
+                                                  .value
+                                                  .duration
+                                                  .inMilliseconds)
+                                          .round(),
+                                    );
+                                    _videoController!.seekTo(target);
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                          Text(
+                            _formatDuration(duration),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                              shadows: const [
+                                Shadow(color: Colors.black, blurRadius: 2),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      // Quick buttons row
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildMiniIconBtn(
+                            icon: Icons.skip_previous_rounded,
+                            onTap: _skipPreviousVideo,
+                          ),
+                          _buildMiniIconBtn(
+                            icon: isPlaying
+                                ? Icons.pause_rounded
+                                : Icons.play_arrow_rounded,
+                            iconColor: Colors.blue,
+                            size: 26,
+                            onTap: _toggleVideoPlayPause,
+                          ),
+                          _buildMiniIconBtn(
+                            icon: Icons.skip_next_rounded,
+                            onTap: _skipNextVideo,
+                          ),
+                          _buildMiniIconBtn(
+                            icon: _isMuted
+                                ? Icons.volume_off_rounded
+                                : Icons.volume_up_rounded,
+                            iconColor: _isMuted
+                                ? Colors.blue
+                                : Colors.white.withValues(alpha: 0.8),
+                            onTap: _toggleVideoMute,
+                          ),
+                          _buildMiniIconBtn(
+                            icon: _favoritesService.isFavorite(item.id)
+                                ? Icons.favorite
+                                : Icons.favorite_border,
+                            iconColor: _favoritesService.isFavorite(item.id)
+                                ? Colors.red
+                                : Colors.white.withValues(alpha: 0.8),
+                            onTap: () => _toggleFavorite(item),
+                          ),
+                          _buildMiniIconBtn(
+                            icon: Icons.open_in_full_rounded,
+                            onTap: () => _openFullVideo(item),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoLargePreview(MediaItem item) {
+    if (item.thumbnailPath != null &&
+        File(item.thumbnailPath!).existsSync()) {
+      return Image.file(
+        File(item.thumbnailPath!),
+        fit: BoxFit.cover,
+        width: double.infinity,
+        height: double.infinity,
+        errorBuilder: (_, __, ___) => _defaultVideoBg(),
       );
     }
+    return FutureBuilder<String?>(
+      future: ThumbnailService.getVideoThumbnail(item.path),
+      builder: (context, snapshot) {
+        if (snapshot.hasData && snapshot.data != null) {
+          return Image.file(
+            File(snapshot.data!),
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: double.infinity,
+            errorBuilder: (_, __, ___) => _defaultVideoBg(),
+          );
+        }
+        return _defaultVideoBg();
+      },
+    );
+  }
 
-    final isVideo = currentItem.type == MediaType.video;
-    final accentColor = isVideo ? Colors.blue : Colors.orange;
+  Widget _buildMiniIconBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color? iconColor,
+    double size = 20,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          color: iconColor ?? Colors.white.withValues(alpha: 0.85),
+          size: size,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMiniAudioPlayer(MediaItem currentItem) {
+    const accentColor = Colors.orange;
 
     return GestureDetector(
-      onTap: () {
-        if (isVideo) {
-          _handlePlayVideo(currentItem);
-        } else {
-          widget.onTap();
-        }
-      },
+      onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
@@ -455,36 +1021,34 @@ class _MiniPlayerState extends State<MiniPlayer> {
                     child: Row(
                       children: [
                         // Animated / Glowing Thumbnail
-                        if (isVideo)
-                          _buildVideoThumbnail(currentItem)
-                        else
-                          StreamBuilder<PlayerState>(
-                            stream: widget.audioPlayer.playerStateStream,
-                            builder: (context, snapshot) {
-                              final isPlaying = snapshot.data?.playing ?? false;
-                              return Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  if (isPlaying)
-                                    Container(
-                                      width: 62,
-                                      height: 62,
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(14),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.orange.withValues(alpha: 0.45),
-                                            blurRadius: 16,
-                                            spreadRadius: 2,
-                                          ),
-                                        ],
-                                      ),
+                        StreamBuilder<PlayerState>(
+                          stream: widget.audioPlayer.playerStateStream,
+                          builder: (context, snapshot) {
+                            final isPlaying = snapshot.data?.playing ?? false;
+                            return Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                if (isPlaying)
+                                  Container(
+                                    width: 62,
+                                    height: 62,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(14),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.orange
+                                              .withValues(alpha: 0.45),
+                                          blurRadius: 16,
+                                          spreadRadius: 2,
+                                        ),
+                                      ],
                                     ),
-                                  _buildThumbnail(currentItem),
-                                ],
-                              );
-                            },
-                          ),
+                                  ),
+                                _buildThumbnail(currentItem),
+                              ],
+                            );
+                          },
+                        ),
                         const SizedBox(width: 14),
                         // Media info
                         Expanded(
@@ -515,23 +1079,22 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                       color: accentColor.withValues(alpha: 0.16),
                                       borderRadius: BorderRadius.circular(5),
                                       border: Border.all(
-                                        color: accentColor.withValues(alpha: 0.35),
+                                        color:
+                                            accentColor.withValues(alpha: 0.35),
                                         width: 0.8,
                                       ),
                                     ),
-                                    child: Row(
+                                    child: const Row(
                                       mainAxisSize: MainAxisSize.min,
                                       children: [
                                         Icon(
-                                          isVideo
-                                              ? Icons.videocam_rounded
-                                              : Icons.music_note_rounded,
+                                          Icons.music_note_rounded,
                                           size: 10,
                                           color: accentColor,
                                         ),
-                                        const SizedBox(width: 3),
+                                        SizedBox(width: 3),
                                         Text(
-                                          isVideo ? 'VIDEO' : 'SONG',
+                                          'SONG',
                                           style: TextStyle(
                                             color: accentColor,
                                             fontSize: 9.5,
@@ -545,9 +1108,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
                                   const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
-                                      currentItem.artist ?? (isVideo ? 'Video file' : 'Unknown Artist'),
+                                      currentItem.artist ?? 'Unknown Artist',
                                       style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.7),
+                                        color:
+                                            Colors.white.withValues(alpha: 0.7),
                                         fontSize: 12,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -564,44 +1128,32 @@ class _MiniPlayerState extends State<MiniPlayer> {
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (!isVideo) ...[
-                              // Mute button
-                              _buildGlassActionBtn(
-                                icon: _isMuted
-                                    ? Icons.volume_off_rounded
-                                    : Icons.volume_up_rounded,
-                                iconColor: _isMuted
-                                    ? Colors.orange
-                                    : Colors.white.withValues(alpha: 0.8),
-                                onTap: _toggleMute,
-                              ),
-                              const SizedBox(width: 6),
-                            ],
-                            // Favorite button
+                            _buildGlassActionBtn(
+                              icon: _isMuted
+                                  ? Icons.volume_off_rounded
+                                  : Icons.volume_up_rounded,
+                              iconColor: _isMuted
+                                  ? Colors.orange
+                                  : Colors.white.withValues(alpha: 0.8),
+                              onTap: _toggleMute,
+                            ),
+                            const SizedBox(width: 6),
                             _buildGlassActionBtn(
                               icon: _favoritesService.isFavorite(currentItem.id)
                                   ? Icons.favorite
                                   : Icons.favorite_border,
-                              iconColor: _favoritesService.isFavorite(currentItem.id)
-                                  ? Colors.red
-                                  : Colors.white.withValues(alpha: 0.8),
+                              iconColor:
+                                  _favoritesService.isFavorite(currentItem.id)
+                                      ? Colors.red
+                                      : Colors.white.withValues(alpha: 0.8),
                               onTap: () => _toggleFavorite(currentItem),
                             ),
                             const SizedBox(width: 6),
-                            if (!isVideo)
-                              // Queue button
-                              _buildGlassActionBtn(
-                                icon: Icons.queue_music_rounded,
-                                iconColor: Colors.white.withValues(alpha: 0.8),
-                                onTap: _showQueueDialog,
-                              )
-                            else
-                              // Open in Video Player button
-                              _buildGlassActionBtn(
-                                icon: Icons.open_in_full_rounded,
-                                iconColor: Colors.blue.withValues(alpha: 0.9),
-                                onTap: () => _handlePlayVideo(currentItem),
-                              ),
+                            _buildGlassActionBtn(
+                              icon: Icons.queue_music_rounded,
+                              iconColor: Colors.white.withValues(alpha: 0.8),
+                              onTap: _showQueueDialog,
+                            ),
                           ],
                         ),
                       ],
@@ -611,9 +1163,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
                   // Progress bar with timestamps
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
-                    child: isVideo
-                        ? _buildVideoProgress()
-                        : _buildAudioProgress(),
+                    child: _buildAudioProgress(),
                   ),
 
                   const SizedBox(height: 8),
@@ -642,78 +1192,49 @@ class _MiniPlayerState extends State<MiniPlayer> {
                       children: [
                         _buildControlButton(
                           icon: Icons.skip_previous_rounded,
-                          onPressed: isVideo ? _skipPreviousVideo : _skipPrevious,
+                          onPressed: _skipPrevious,
                           size: 32,
                         ),
-                        if (isVideo)
-                          Container(
-                            decoration: BoxDecoration(
-                              gradient: const LinearGradient(
-                                colors: [
-                                  Color(0xFF00B0FF),
-                                  Color(0xFF0091EA),
-                                ],
-                              ),
-                              shape: BoxShape.circle,
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.blue.withValues(alpha: 0.45),
-                                  blurRadius: 10,
-                                  spreadRadius: 1,
-                                ),
-                              ],
-                            ),
-                            child: IconButton(
-                              icon: Icon(
-                                _playbackManager.isPlaying
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                              ),
-                              iconSize: 32,
-                              onPressed: () => _handlePlayVideo(currentItem),
-                            ),
-                          )
-                        else
-                          StreamBuilder<PlayerState>(
-                            stream: widget.audioPlayer.playerStateStream,
-                            builder: (context, snapshot) {
-                              final playerState = snapshot.data;
-                              final isPlaying = playerState?.playing ?? false;
+                        StreamBuilder<PlayerState>(
+                          stream: widget.audioPlayer.playerStateStream,
+                          builder: (context, snapshot) {
+                            final playerState = snapshot.data;
+                            final isPlaying = playerState?.playing ?? false;
 
-                              return Container(
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [
-                                      Color(0xFFFF9800),
-                                      Color(0xFFFF6F00),
-                                    ],
-                                  ),
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.orange.withValues(alpha: 0.45),
-                                      blurRadius: 10,
-                                      spreadRadius: 1,
-                                    ),
+                            return Container(
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFFFF9800),
+                                    Color(0xFFFF6F00),
                                   ],
                                 ),
-                                child: IconButton(
-                                  icon: Icon(
-                                    isPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                    color:
+                                        Colors.orange.withValues(alpha: 0.45),
+                                    blurRadius: 10,
+                                    spreadRadius: 1,
                                   ),
-                                  iconSize: 32,
-                                  onPressed: _togglePlayPause,
+                                ],
+                              ),
+                              child: IconButton(
+                                icon: Icon(
+                                  isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: Colors.white,
                                 ),
-                              );
-                            },
-                          ),
+                                iconSize: 32,
+                                onPressed: _togglePlayPause,
+                              ),
+                            );
+                          },
+                        ),
                         _buildControlButton(
                           icon: Icons.skip_next_rounded,
-                          onPressed: isVideo ? _skipNextVideo : _skipNext,
+                          onPressed: _skipNext,
                           size: 32,
                         ),
                       ],
@@ -779,51 +1300,6 @@ class _MiniPlayerState extends State<MiniPlayer> {
     );
   }
 
-  Widget _buildVideoProgress() {
-    final pos = _playbackManager.position;
-    final dur = _playbackManager.duration;
-    final progress = dur.inMilliseconds > 0
-        ? pos.inMilliseconds / dur.inMilliseconds
-        : 0.0;
-
-    return Column(
-      children: [
-        ClipRRect(
-          borderRadius: BorderRadius.circular(3),
-          child: LinearProgressIndicator(
-            value: progress.clamp(0.0, 1.0),
-            backgroundColor: Colors.white.withValues(alpha: 0.12),
-            valueColor: AlwaysStoppedAnimation<Color>(
-              Colors.blue.withValues(alpha: 0.95),
-            ),
-            minHeight: 4,
-          ),
-        ),
-        const SizedBox(height: 6),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              dur > Duration.zero ? _formatDuration(pos) : 'Video ready',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            Text(
-              dur > Duration.zero ? _formatDuration(dur) : 'Tap to watch',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 11,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
 
   Widget _buildMediaBackground(MediaItem item) {
     if (item.type == MediaType.video) {
