@@ -36,6 +36,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   MediaItem? _sampleAudioItem;
   MediaItem? _sampleVideoItem;
   bool _isLoadingMedia = true;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -106,6 +107,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   @override
   void dispose() {
+    _scrollController.dispose();
     _playbackManager.removeListener(_onPlaybackChanged);
     _favoritesService.removeListener(_onFavoritesChanged);
     _historyService.removeListener(_onHistoryChanged);
@@ -131,6 +133,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
+      controller: _scrollController,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -714,7 +717,28 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   Future<void> _playHistoryItem(MediaItem item) async {
     if (item.type == MediaType.audio) {
+      // 1. Immediately inform PlaybackManager that active media is now this song
+      // This immediately switches MiniPlayer to audio mode and disposes any video controller cleanly.
+      PlaybackManager().updateCurrentlyPlaying(item);
+      PlaybackManager().updatePlayingState(false);
+
+      // 2. Add to history & save last played
+      await _historyService.addToHistory(item);
+      await LastPlayedService.saveLastPlayed(item, 0);
+
+      // 3. Update queue so next/previous buttons work
+      final queue = QueueService().queue;
+      final existingIndex =
+          queue.indexWhere((m) => m.id == item.id || m.path == item.path);
+      if (existingIndex >= 0) {
+        QueueService().setCurrentIndex(existingIndex);
+      } else {
+        QueueService().setQueue([item], startIndex: 0);
+      }
+
+      // 4. Load audio file and start playback
       try {
+        await AudioPlayerService().player.stop();
         await AudioPlayerService().player.setFilePath(item.path);
         AudioPlayerService().updateCurrentMediaItem(
           title: item.title,
@@ -729,16 +753,35 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           playing: true,
         );
         await AudioPlayerService().player.play();
-        PlaybackManager().updateCurrentlyPlaying(item);
-        await _historyService.addToHistory(item);
-        await LastPlayedService.saveLastPlayed(item, 0);
+        PlaybackManager().updatePlayingState(true);
       } catch (e) {
-        // Fallback
+        debugPrint('Error playing audio from history: $e');
       }
     } else {
-      VideoPlayerScreen.playExternalVideo(item);
-      widget.onNavigate?.call(2);
+      // Pause any ongoing audio playback
+      try {
+        if (AudioPlayerService().player.playing) {
+          await AudioPlayerService().player.pause();
+        }
+      } catch (_) {}
+
+      // Set video as currently playing & active in MiniPlayer on dashboard
+      PlaybackManager().updateCurrentlyPlaying(item);
+      PlaybackManager().updatePlayingState(true);
+      await _historyService.addToHistory(item);
+      await LastPlayedService.saveLastPlayed(item, 0);
     }
+
+    // Smoothly scroll up to the mini player so the user immediately sees playback
+    if (_scrollController.hasClients && _scrollController.offset > 40) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOutCubic,
+      );
+    }
+
+    if (mounted) setState(() {});
   }
 
   Widget _buildQuickAccessCard({

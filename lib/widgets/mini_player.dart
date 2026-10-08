@@ -50,9 +50,14 @@ class _MiniPlayerState extends State<MiniPlayer> {
     _favoritesService.addListener(_onFavoritesChanged);
     _historyService.addListener(_onHistoryChanged);
 
-    // Auto-pause video if audio playback starts
+    // Auto-pause video if audio playback starts & sync playing state
     _audioPlayingSubscription =
         widget.audioPlayer.playingStream.listen((playing) {
+      final current = _playbackManager.currentlyPlaying ??
+          _historyService.history.firstOrNull;
+      if (current != null && current.type == MediaType.audio) {
+        _playbackManager.updatePlayingState(playing);
+      }
       if (playing && _videoController?.value.isPlaying == true) {
         _videoController?.pause();
         if (mounted) setState(() {});
@@ -82,9 +87,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
     final current = _playbackManager.currentlyPlaying ??
         _historyService.history.firstOrNull;
     if (current != null && current.type == MediaType.video) {
-      if (_currentVideoPath != current.path) {
-        _initVideoController(current.path, autoPlay: _playbackManager.isPlaying);
-      }
+      _initVideoController(current.path, autoPlay: _playbackManager.isPlaying);
     } else {
       if (_videoController != null) {
         _disposeVideoController();
@@ -101,6 +104,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
       if (_currentVideoPath != current.path) {
         _initVideoController(current.path);
       }
+    } else if (current != null && current.type == MediaType.audio) {
+      if (_videoController != null) {
+        _disposeVideoController();
+      }
     }
     setState(() {});
   }
@@ -111,11 +118,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
 
   Future<void> _initVideoController(String path, {bool autoPlay = false}) async {
     if (_currentVideoPath == path && _videoController != null) {
-      if (autoPlay && !_videoController!.value.isPlaying) {
+      final ctrl = _videoController;
+      if (ctrl == null) return;
+      if (autoPlay && !ctrl.value.isPlaying) {
         if (widget.audioPlayer.playing) {
           await widget.audioPlayer.pause();
         }
-        await _videoController!.play();
+        if (!mounted || _currentVideoPath != path || _videoController != ctrl) {
+          return;
+        }
+        await ctrl.play();
         _playbackManager.updatePlayingState(true);
         _startHideVideoControlsTimer();
         if (mounted) setState(() {});
@@ -130,6 +142,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
     await old?.pause();
     await old?.dispose();
 
+    if (!mounted || _currentVideoPath != path) {
+      return;
+    }
+
     try {
       final controller = VideoPlayerController.file(
         File(path),
@@ -138,7 +154,10 @@ class _MiniPlayerState extends State<MiniPlayer> {
       _videoController = controller;
       await controller.initialize();
 
-      if (!mounted || _currentVideoPath != path) {
+      if (!mounted || _currentVideoPath != path || _videoController != controller) {
+        if (_videoController == controller) {
+          _videoController = null;
+        }
         await controller.dispose();
         return;
       }
@@ -157,12 +176,15 @@ class _MiniPlayerState extends State<MiniPlayer> {
         if (widget.audioPlayer.playing) {
           await widget.audioPlayer.pause();
         }
+        if (!mounted || _currentVideoPath != path || _videoController != controller) {
+          return;
+        }
         await controller.play();
         _playbackManager.updatePlayingState(true);
         _startHideVideoControlsTimer();
       }
 
-      if (mounted) {
+      if (mounted && _videoController == controller) {
         setState(() {
           _isVideoInitialized = true;
         });
@@ -174,10 +196,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   void _onVideoTick() {
-    if (!mounted || _videoController == null) return;
-    final isPlaying = _videoController!.value.isPlaying;
-    final pos = _videoController!.value.position;
-    final dur = _videoController!.value.duration;
+    final ctrl = _videoController;
+    if (!mounted || ctrl == null || !ctrl.value.isInitialized) return;
+    final isPlaying = ctrl.value.isPlaying;
+    final pos = ctrl.value.position;
+    final dur = ctrl.value.duration;
 
     if (_playbackManager.isPlaying != isPlaying) {
       _playbackManager.updatePlayingState(isPlaying);
@@ -212,24 +235,26 @@ class _MiniPlayerState extends State<MiniPlayer> {
         _historyService.history.firstOrNull;
     if (current == null) return;
 
-    if (_videoController == null || !_videoController!.value.isInitialized) {
+    final ctrl = _videoController;
+    if (ctrl == null || !ctrl.value.isInitialized) {
       await _initVideoController(current.path, autoPlay: true);
       return;
     }
 
-    if (_videoController!.value.isPlaying) {
-      await _videoController!.pause();
+    if (ctrl.value.isPlaying) {
+      await ctrl.pause();
       _playbackManager.updatePlayingState(false);
       _hideVideoControlsTimer?.cancel();
-      setState(() => _showVideoControls = true);
+      if (mounted) setState(() => _showVideoControls = true);
     } else {
       if (widget.audioPlayer.playing) {
         await widget.audioPlayer.pause();
       }
-      await _videoController!.play();
+      if (!mounted || _videoController != ctrl) return;
+      await ctrl.play();
       _playbackManager.updatePlayingState(true);
       _startHideVideoControlsTimer();
-      setState(() {});
+      if (mounted) setState(() {});
     }
   }
 
@@ -239,10 +264,11 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   void _openFullVideo(MediaItem item) {
-    if (_videoController != null && _videoController!.value.isInitialized) {
-      _playbackManager.updatePosition(_videoController!.value.position);
-      _playbackManager.updateDuration(_videoController!.value.duration);
-      _videoController!.pause();
+    final ctrl = _videoController;
+    if (ctrl != null && ctrl.value.isInitialized) {
+      _playbackManager.updatePosition(ctrl.value.position);
+      _playbackManager.updateDuration(ctrl.value.duration);
+      ctrl.pause();
     }
     if (widget.onPlayVideo != null) {
       widget.onPlayVideo!(item);
@@ -252,10 +278,23 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   Future<void> _togglePlayPause() async {
-    if (_playbackManager.isPlaying) {
-      await widget.audioPlayer.pause();
-    } else {
-      await widget.audioPlayer.play();
+    try {
+      if (widget.audioPlayer.playing) {
+        await widget.audioPlayer.pause();
+        _playbackManager.updatePlayingState(false);
+      } else {
+        final current = _playbackManager.currentlyPlaying ??
+            _historyService.history.firstOrNull;
+        if (current != null &&
+            current.type == MediaType.audio &&
+            widget.audioPlayer.audioSource == null) {
+          await widget.audioPlayer.setFilePath(current.path);
+        }
+        await widget.audioPlayer.play();
+        _playbackManager.updatePlayingState(true);
+      }
+    } catch (e) {
+      debugPrint('Error toggling audio playback: $e');
     }
   }
 
@@ -559,15 +598,16 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   Widget _buildMiniVideoPlayer(MediaItem item) {
+    final ctrl = _videoController;
     final isInitialized = _isVideoInitialized &&
-        _videoController != null &&
-        _videoController!.value.isInitialized;
-    final isPlaying = isInitialized && _videoController!.value.isPlaying;
+        ctrl != null &&
+        ctrl.value.isInitialized;
+    final isPlaying = isInitialized && ctrl.value.isPlaying;
     final position = isInitialized
-        ? _videoController!.value.position
+        ? ctrl.value.position
         : _playbackManager.position;
     final duration = isInitialized
-        ? _videoController!.value.duration
+        ? ctrl.value.duration
         : _playbackManager.duration;
     final progress = duration.inMilliseconds > 0
         ? position.inMilliseconds / duration.inMilliseconds
@@ -606,8 +646,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 child: isInitialized
                     ? Center(
                         child: AspectRatio(
-                          aspectRatio: _videoController!.value.aspectRatio,
-                          child: VideoPlayer(_videoController!),
+                          aspectRatio: ctrl!.value.aspectRatio,
+                          child: VideoPlayer(ctrl),
                         ),
                       )
                     : _buildVideoLargePreview(item),
@@ -807,17 +847,18 @@ class _MiniPlayerState extends State<MiniPlayer> {
                               child: Slider(
                                 value: progress.clamp(0.0, 1.0),
                                 onChanged: (val) {
-                                  if (_videoController != null &&
-                                      _videoController!.value.isInitialized) {
+                                  final ctrl = _videoController;
+                                  if (ctrl != null &&
+                                      ctrl.value.isInitialized) {
                                     final target = Duration(
                                       milliseconds: (val *
-                                              _videoController!
+                                              ctrl
                                                   .value
                                                   .duration
                                                   .inMilliseconds)
                                           .round(),
                                     );
-                                    _videoController!.seekTo(target);
+                                    ctrl.seekTo(target);
                                   }
                                 },
                               ),
