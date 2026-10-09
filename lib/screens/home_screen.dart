@@ -41,6 +41,12 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadLastPlayedSong();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    precacheImage(const AssetImage('assets/images/logo.png'), context);
+  }
+
   Future<void> _loadLastPlayedSong() async {
     final last = await LastPlayedService.loadLastPlayed();
     if (last != null && last['item'] != null) {
@@ -343,7 +349,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         drawerEnableOpenDragGesture: false,
-        drawerScrimColor: Colors.black.withValues(alpha: 0.45),
+        drawerScrimColor: Colors.black.withValues(alpha: 0.55),
         extendBodyBehindAppBar: true,
         appBar: _VibeWaveAppBar(
           selectedIndex: _selectedDrawerIndex,
@@ -374,14 +380,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.45),
-                    blurRadius: 22,
-                    offset: const Offset(6, 0),
+                    color: Colors.black.withValues(alpha: 0.55),
+                    blurRadius: 24,
+                    offset: const Offset(8, 0),
                   ),
                   BoxShadow(
-                    color: Colors.orange.withValues(alpha: 0.06),
-                    blurRadius: 14,
-                    offset: const Offset(2, 0),
+                    color: Colors.orange.withValues(alpha: 0.08),
+                    blurRadius: 16,
+                    offset: const Offset(3, 0),
                   ),
                 ],
               ),
@@ -389,41 +395,40 @@ class _HomeScreenState extends State<HomeScreen> {
                 borderRadius: const BorderRadius.horizontal(
                   right: Radius.circular(28),
                 ),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF141414).withValues(alpha: 0.76),
-                      border: Border(
-                        right: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.18),
-                          width: 1.2,
-                        ),
-                        top: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          width: 1.0,
-                        ),
-                        bottom: BorderSide(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          width: 1.0,
-                        ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141414).withValues(alpha: 0.94),
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.18),
+                        width: 1.2,
                       ),
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white.withValues(alpha: 0.10),
-                          Colors.white.withValues(alpha: 0.02),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.35, 1.0],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1.0,
+                      ),
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1.0,
                       ),
                     ),
-                    child: SafeArea(
-                      child: ListView(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        children: [
-                          _buildDrawerHeader(),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.09),
+                        Colors.white.withValues(alpha: 0.02),
+                        Colors.transparent,
+                        Colors.orange.withValues(alpha: 0.015),
+                      ],
+                      stops: const [0.0, 0.25, 0.75, 1.0],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        _buildDrawerHeader(),
                         const SizedBox(height: 6),
                         _buildDrawerItem(
                           icon: Icons.home_rounded,
@@ -532,8 +537,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-      ),
-      body: IndexedStack(
+        body: IndexedStack(
           index: _selectedDrawerIndex,
           children: List.generate(
             _screens.length,
