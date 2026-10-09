@@ -645,61 +645,99 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
   Widget build(BuildContext context) {
     final double statusBarHeight = MediaQuery.of(context).padding.top;
 
-    return Padding(
-      padding: EdgeInsets.only(
-        top: statusBarHeight + 4,
-        left: 12,
-        right: 12,
-        bottom: 4,
-      ),
-      child: Container(
-        height: kToolbarHeight - 2,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(28),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.35),
-              blurRadius: 18,
-              spreadRadius: 0,
-              offset: const Offset(0, 6),
-            ),
-            BoxShadow(
-              color: Colors.orange.withValues(alpha: 0.06),
-              blurRadius: 6,
-              spreadRadius: 0,
-              offset: const Offset(0, 2),
-            ),
-          ],
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.12),
-            width: 1.2,
-          ),
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              height: kToolbarHeight - 2,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
-                gradient: LinearGradient(
-                  colors: [
-                    Colors.white.withValues(alpha: 0.08),
-                    Colors.white.withValues(alpha: 0.02),
-                  ],
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // Frosted Crystal Glass Status Bar overlay
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          height: statusBarHeight,
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFF141414).withValues(alpha: 0.50),
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.white.withValues(alpha: 0.08),
+                      Colors.transparent,
+                    ],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                  border: Border(
+                    bottom: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      width: 0.8,
+                    ),
+                  ),
                 ),
               ),
-              child: selectedIndex == 0 && !isSearching
-                  ? _buildHomeHeader(context)
-                  : _buildStandardHeader(context),
             ),
           ),
         ),
-      ),
+
+        // Floating Glass App Bar Pill
+        Padding(
+          padding: EdgeInsets.only(
+            top: statusBarHeight + 4,
+            left: 12,
+            right: 12,
+            bottom: 4,
+          ),
+          child: Container(
+            height: kToolbarHeight - 2,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(28),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.35),
+                  blurRadius: 18,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 6),
+                ),
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.06),
+                  blurRadius: 6,
+                  spreadRadius: 0,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.12),
+                width: 1.2,
+              ),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(28),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Container(
+                  height: kToolbarHeight - 2,
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.white.withValues(alpha: 0.02),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                  child: selectedIndex == 0 && !isSearching
+                      ? _buildHomeHeader(context)
+                      : _buildStandardHeader(context),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 
