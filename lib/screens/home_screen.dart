@@ -285,7 +285,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -364,161 +363,171 @@ class _HomeScreenState extends State<HomeScreen> {
           onDeletePlaylists: () => _showDeleteAllPlaylistsDialog(context),
         ),
         drawer: Drawer(
-          backgroundColor: const Color(0xFF1a1a1a),
-          child: ListView(
-            padding: EdgeInsets.zero,
-            children: [
-              DrawerHeader(
-                decoration: const BoxDecoration(color: Color(0xFF1a1a1a)),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    Image.asset(
-                      'assets/images/logo.png',
-                      width: 60,
-                      height: 60,
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'VibeWave Player',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    Text(
-                      'Version 1.0.0',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.8),
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.horizontal(
+                right: Radius.circular(28),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  blurRadius: 32,
+                  spreadRadius: 2,
+                  offset: const Offset(8, 0),
                 ),
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.08),
+                  blurRadius: 18,
+                  offset: const Offset(4, 0),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.horizontal(
+                right: Radius.circular(28),
               ),
-              _buildDrawerItem(
-                icon: Icons.home_rounded,
-                title: 'Home',
-                isSelected: _selectedDrawerIndex == 0,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(0);
-                },
-              ),
-              _buildDrawerItem(
-                icon: Icons.library_music_rounded,
-                title: 'My Music',
-                isSelected: _selectedDrawerIndex == 1,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(1);
-                },
-              ),
-              _buildDrawerItem(
-                icon: Icons.video_library_rounded,
-                title: 'My Videos',
-                isSelected: _selectedDrawerIndex == 2,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(2);
-                },
-              ),
-              _buildDrawerItem(
-                icon: Icons.graphic_eq_rounded,
-                title: 'Sound Effects',
-                isSelected: _selectedDrawerIndex == 3,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(3);
-                },
-              ),
-              _buildDrawerItem(
-                icon: Icons.bookmark_rounded,
-                title: 'Bookmarks',
-                isSelected: _selectedDrawerIndex == 4,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(4);
-                },
-              ),
-              _buildDrawerItem(
-                icon: Icons.favorite_rounded,
-                title: 'Favorites',
-                isSelected: _selectedDrawerIndex == 5,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(5);
-                },
-              ),
-              _buildDrawerItem(
-                icon: Icons.queue_music_rounded,
-                title: 'Queue',
-                isSelected: _selectedDrawerIndex == 6,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(6);
-                },
-              ),
-              const Divider(
-                color: Colors.white24,
-                thickness: 1,
-                indent: 16,
-                endIndent: 16,
-              ),
-              Padding(
-                padding: const EdgeInsets.only(left: 16, top: 8, bottom: 4),
-                child: Text(
-                  'PLAYLISTS',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.5),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 1.2,
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF141414).withValues(alpha: 0.88),
+                    border: Border(
+                      right: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.16),
+                        width: 1.2,
+                      ),
+                      top: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1.0,
+                      ),
+                      bottom: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        width: 1.0,
+                      ),
+                    ),
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.white.withValues(alpha: 0.01),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      children: [
+                        _buildDrawerHeader(),
+                        const SizedBox(height: 6),
+                        _buildDrawerItem(
+                          icon: Icons.home_rounded,
+                          title: 'Home',
+                          isSelected: _selectedDrawerIndex == 0,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(0);
+                          },
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.library_music_rounded,
+                          title: 'My Music',
+                          isSelected: _selectedDrawerIndex == 1,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(1);
+                          },
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.video_library_rounded,
+                          title: 'My Videos',
+                          isSelected: _selectedDrawerIndex == 2,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(2);
+                          },
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.graphic_eq_rounded,
+                          title: 'Sound Effects',
+                          isSelected: _selectedDrawerIndex == 3,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(3);
+                          },
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.bookmark_rounded,
+                          title: 'Bookmarks',
+                          isSelected: _selectedDrawerIndex == 4,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(4);
+                          },
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.favorite_rounded,
+                          title: 'Favorites',
+                          isSelected: _selectedDrawerIndex == 5,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(5);
+                          },
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.queue_music_rounded,
+                          title: 'Queue',
+                          isSelected: _selectedDrawerIndex == 6,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(6);
+                          },
+                        ),
+                        _buildDrawerDivider(),
+                        _buildDrawerSectionTitle('PLAYLISTS'),
+                        _buildDrawerItem(
+                          icon: Icons.playlist_play_rounded,
+                          title: 'Playlists',
+                          trailing: Icons.arrow_forward_ios_rounded,
+                          isOrange: true,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(7);
+                          },
+                        ),
+                        _buildDrawerDivider(),
+                        _buildDrawerItem(
+                          icon: Icons.settings_rounded,
+                          title: 'Settings',
+                          isSelected: _selectedDrawerIndex == 8,
+                          onTap: () {
+                            Navigator.pop(context);
+                            _navigateToScreen(8);
+                          },
+                        ),
+                        _buildDrawerItem(
+                          icon: Icons.info_outline_rounded,
+                          title: 'About',
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AboutScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
                   ),
                 ),
               ),
-              _buildDrawerItem(
-                icon: Icons.playlist_play_rounded,
-                title: 'Playlists',
-                trailing: Icons.arrow_forward_ios,
-                isOrange: true,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(7);
-                },
-              ),
-              const SizedBox(height: 16),
-              const Divider(
-                color: Colors.white24,
-                thickness: 1,
-                indent: 16,
-                endIndent: 16,
-              ),
-              _buildDrawerItem(
-                icon: Icons.settings_rounded,
-                title: 'Settings',
-                isSelected: _selectedDrawerIndex == 8,
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateToScreen(8);
-                },
-              ),
-              _buildDrawerItem(
-                icon: Icons.info_outline_rounded,
-                title: 'About',
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const AboutScreen(),
-                    ),
-                  );
-                },
-              ),
-            ],
+            ),
           ),
         ),
         body: IndexedStack(
@@ -546,6 +555,165 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  Widget _buildDrawerHeader() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1E1E1E).withValues(alpha: 0.75),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.12),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
+          ),
+          BoxShadow(
+            color: Colors.orange.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+        gradient: LinearGradient(
+          colors: [Colors.white.withValues(alpha: 0.08), Colors.transparent],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // 3D Crystal Logo Badge
+              SizedBox(
+                width: 50,
+                height: 50,
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'VibeWave',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: -0.4,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Media Player',
+                      style: TextStyle(
+                        color: Colors.orange.withValues(alpha: 0.95),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          // Version badge with subtle crystal glass pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 6,
+                  height: 6,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.orange,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  'Version 1.0.0',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.70),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerDivider() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      height: 1,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.transparent,
+            Colors.white.withValues(alpha: 0.12),
+            Colors.transparent,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDrawerSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.orange,
+              borderRadius: BorderRadius.circular(2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.60),
+                  blurRadius: 6,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            title,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.50),
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildDrawerItem({
     required IconData icon,
     required String title,
@@ -554,31 +722,119 @@ class _HomeScreenState extends State<HomeScreen> {
     bool isOrange = false,
     required VoidCallback onTap,
   }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isSelected || isOrange
-            ? Colors.orange
-            : Colors.white.withOpacity(0.8),
-        size: 24,
+    final bool active = isSelected || isOrange;
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? const Color(0xFF241C16).withValues(alpha: 0.85)
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected
+              ? Colors.orange.withValues(alpha: 0.45)
+              : Colors.transparent,
+          width: 1.2,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: Colors.orange.withValues(alpha: 0.20),
+                  blurRadius: 10,
+                  offset: const Offset(0, 3),
+                ),
+              ]
+            : null,
       ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isSelected || isOrange
-              ? Colors.orange
-              : Colors.white.withOpacity(0.9),
-          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-          fontSize: 15,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          splashColor: Colors.orange.withValues(alpha: 0.15),
+          highlightColor: Colors.white.withValues(alpha: 0.04),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+            child: Row(
+              children: [
+                // 3D Crystal Icon Badge
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: active
+                        ? Colors.orange.withValues(alpha: 0.20)
+                        : Colors.white.withValues(alpha: 0.05),
+                    borderRadius: BorderRadius.circular(11),
+                    border: Border.all(
+                      color: active
+                          ? Colors.orange.withValues(alpha: 0.45)
+                          : Colors.white.withValues(alpha: 0.09),
+                      width: 1.0,
+                    ),
+                    boxShadow: active
+                        ? [
+                            BoxShadow(
+                              color: Colors.orange.withValues(alpha: 0.25),
+                              blurRadius: 8,
+                            ),
+                          ]
+                        : null,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 20,
+                    color: active
+                        ? Colors.orange
+                        : Colors.white.withValues(alpha: 0.85),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                // Title
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: active
+                          ? Colors.orange
+                          : Colors.white.withValues(alpha: 0.90),
+                      fontSize: 14.5,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                ),
+                // Trailing
+                if (isSelected)
+                  Container(
+                    width: 6,
+                    height: 18,
+                    decoration: BoxDecoration(
+                      color: Colors.orange,
+                      borderRadius: BorderRadius.circular(3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withValues(alpha: 0.60),
+                          blurRadius: 6,
+                        ),
+                      ],
+                    ),
+                  )
+                else if (trailing != null)
+                  Icon(
+                    trailing,
+                    size: 16,
+                    color: Colors.white.withValues(alpha: 0.40),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
-      trailing: trailing != null
-          ? Icon(trailing, color: Colors.white.withOpacity(0.5), size: 20)
-          : null,
-      selected: isSelected,
-      selectedTileColor: Colors.orange.withOpacity(0.1),
-      onTap: onTap,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 }
@@ -629,15 +885,24 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
 
   String _titleFor(int index) {
     switch (index) {
-      case 1: return 'My Music';
-      case 2: return 'My Videos';
-      case 3: return 'Sound Effects';
-      case 4: return 'Bookmarks';
-      case 5: return 'Favorites';
-      case 6: return 'Queue';
-      case 7: return 'Playlists';
-      case 8: return 'Settings';
-      default: return 'VibeWave';
+      case 1:
+        return 'My Music';
+      case 2:
+        return 'My Videos';
+      case 3:
+        return 'Sound Effects';
+      case 4:
+        return 'Bookmarks';
+      case 5:
+        return 'Favorites';
+      case 6:
+        return 'Queue';
+      case 7:
+        return 'Playlists';
+      case 8:
+        return 'Settings';
+      default:
+        return 'VibeWave';
     }
   }
 
@@ -749,7 +1014,11 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
         Builder(
           builder: (ctx) => _ActionPill(
             onTap: () => Scaffold.of(ctx).openDrawer(),
-            child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
+            child: const Icon(
+              Icons.menu_rounded,
+              color: Colors.white,
+              size: 20,
+            ),
           ),
         ),
         const SizedBox(width: 10),
@@ -794,7 +1063,11 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
             child: Builder(
               builder: (ctx) => _ActionPill(
                 onTap: () => Scaffold.of(ctx).openDrawer(),
-                child: const Icon(Icons.menu_rounded, color: Colors.white, size: 20),
+                child: const Icon(
+                  Icons.menu_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
               ),
             ),
           ),
@@ -815,7 +1088,9 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
                         : selectedIndex == 6
                         ? 'Search queue...'
                         : 'Search playlists...',
-                    hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.45)),
+                    hintStyle: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -932,27 +1207,59 @@ class _OverflowPill extends StatelessWidget {
             width: 1,
           ),
         ),
-        child: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 19),
+        child: const Icon(
+          Icons.more_vert_rounded,
+          color: Colors.white,
+          size: 19,
+        ),
       ),
       color: const Color(0xFF2a2a2a),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       onSelected: (value) {
         switch (value) {
-          case 'clear_bookmarks': onClearBookmarks(); break;
-          case 'clear_favorites': onClearFavorites(); break;
-          case 'clear_queue': onClearQueue(); break;
-          case 'delete_playlists': onDeletePlaylists(); break;
+          case 'clear_bookmarks':
+            onClearBookmarks();
+            break;
+          case 'clear_favorites':
+            onClearFavorites();
+            break;
+          case 'clear_queue':
+            onClearQueue();
+            break;
+          case 'delete_playlists':
+            onDeletePlaylists();
+            break;
         }
       },
       itemBuilder: (_) {
         if (selectedIndex == 4) {
-          return [_menuItem('clear_bookmarks', Icons.delete_outline, 'Clear all bookmarks')];
+          return [
+            _menuItem(
+              'clear_bookmarks',
+              Icons.delete_outline,
+              'Clear all bookmarks',
+            ),
+          ];
         } else if (selectedIndex == 5) {
-          return [_menuItem('clear_favorites', Icons.delete_outline, 'Clear all favorites')];
+          return [
+            _menuItem(
+              'clear_favorites',
+              Icons.delete_outline,
+              'Clear all favorites',
+            ),
+          ];
         } else if (selectedIndex == 6) {
-          return [_menuItem('clear_queue', Icons.delete_outline, 'Clear queue')];
+          return [
+            _menuItem('clear_queue', Icons.delete_outline, 'Clear queue'),
+          ];
         } else {
-          return [_menuItem('delete_playlists', Icons.delete_sweep, 'Delete all playlists')];
+          return [
+            _menuItem(
+              'delete_playlists',
+              Icons.delete_sweep,
+              'Delete all playlists',
+            ),
+          ];
         }
       },
     );
@@ -965,7 +1272,10 @@ class _OverflowPill extends StatelessWidget {
         children: [
           Icon(icon, color: Colors.red, size: 20),
           const SizedBox(width: 12),
-          Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.9))),
+          Text(
+            label,
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.9)),
+          ),
         ],
       ),
     );
