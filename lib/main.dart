@@ -13,6 +13,13 @@ void main() async {
 
   // Optimize for low-end devices
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Colors.transparent,
+    ),
+  );
 
   runApp(LiquidGlassWidgets.wrap(child: const MyApp()));
 }

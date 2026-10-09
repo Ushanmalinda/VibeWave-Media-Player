@@ -344,6 +344,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         drawerEnableOpenDragGesture: false,
+        extendBodyBehindAppBar: true,
         appBar: _VibeWaveAppBar(
           selectedIndex: _selectedDrawerIndex,
           isSearching: _isSearching,
@@ -520,8 +521,28 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
         ),
-        body: IndexedStack(index: _selectedDrawerIndex, children: _screens),
+        body: IndexedStack(
+          index: _selectedDrawerIndex,
+          children: List.generate(
+            _screens.length,
+            (i) => _wrapScreen(i, _screens[i]),
+          ),
+        ),
       ),
+    );
+  }
+
+  Widget _wrapScreen(int index, Widget screen) {
+    if (index == 0) return screen;
+    return Builder(
+      builder: (context) {
+        final double topPadding =
+            MediaQuery.of(context).padding.top + kToolbarHeight + 8;
+        return Padding(
+          padding: EdgeInsets.only(top: topPadding),
+          child: screen,
+        );
+      },
     );
   }
 
@@ -604,7 +625,7 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
   });
 
   @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 16);
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight + 6);
 
   String _titleFor(int index) {
     switch (index) {
@@ -631,11 +652,9 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
         right: 12,
         bottom: 4,
       ),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
+      child: Container(
+        height: kToolbarHeight - 2,
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
           borderRadius: BorderRadius.circular(28),
           boxShadow: [
             BoxShadow(
@@ -652,28 +671,32 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
             ),
           ],
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.10),
+            color: Colors.white.withValues(alpha: 0.12),
             width: 1.2,
           ),
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
-          child: Container(
-            height: kToolbarHeight - 2,
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.white.withValues(alpha: 0.06),
-                  Colors.transparent,
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+            child: Container(
+              height: kToolbarHeight - 2,
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.white.withValues(alpha: 0.08),
+                    Colors.white.withValues(alpha: 0.02),
+                  ],
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                ),
               ),
+              child: selectedIndex == 0 && !isSearching
+                  ? _buildHomeHeader(context)
+                  : _buildStandardHeader(context),
             ),
-            child: selectedIndex == 0 && !isSearching
-                ? _buildHomeHeader(context)
-                : _buildStandardHeader(context),
           ),
         ),
       ),

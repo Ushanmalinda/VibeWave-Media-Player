@@ -113,23 +113,30 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final double topPadding = MediaQuery.of(context).padding.top + 10;
+
     return SingleChildScrollView(
       controller: _scrollController,
       physics: const BouncingScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.only(
+          top: topPadding,
+          left: 16,
+          right: 16,
+          bottom: 16,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Now Playing section (isolated with RepaintBoundary so playback ticks don't repaint dashboard)
-            const SizedBox(height: 12),
             RepaintBoundary(
               child: MiniPlayer(
                 audioPlayer: AudioPlayerService().player,
                 onTap: () {
-                  final current = _playbackManager.currentlyPlaying ??
+                  final current =
+                      _playbackManager.currentlyPlaying ??
                       _historyService.history.firstOrNull;
                   if (current != null && current.type == MediaType.video) {
                     VideoPlayerScreen.playExternalVideo(
@@ -308,48 +315,48 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(18),
             ),
-              child: Column(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.10),
-                        width: 1,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.history_rounded,
-                      size: 26,
-                      color: Colors.orange,
+            child: Column(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.10),
+                      width: 1,
                     ),
                   ),
-                  const SizedBox(height: 10),
-                  const Text(
-                    'No Recent Play History',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 14.5,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: const Icon(
+                    Icons.history_rounded,
+                    size: 26,
+                    color: Colors.orange,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Songs and videos you play will appear here',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: 12,
-                    ),
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'No Recent Play History',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Songs and videos you play will appear here',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
-        );
-      }
+        ),
+      );
+    }
 
     // Show only the last 5 recent items
     final displayItems = history.take(5).toList();
@@ -393,9 +400,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           child: Stack(
             children: [
               // 1. Color-graded ambient glow matching application UI (orange for songs, blue for videos)
-              Positioned.fill(
-                child: _buildHistoryMeshGradient(isAudio),
-              ),
+              Positioned.fill(child: _buildHistoryMeshGradient(isAudio)),
 
               // 2. Crystal glass dark frosted tint overlay
               Positioned.fill(
@@ -438,102 +443,103 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                     vertical: 6,
                   ),
                   leading: _HistoryThumbnail(item: item),
-                title: Text(
-                  item.title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14.5,
-                    letterSpacing: 0.2,
+                  title: Text(
+                    item.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14.5,
+                      letterSpacing: 0.2,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                subtitle: Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isAudio
-                              ? Colors.orange.withValues(alpha: 0.22)
-                              : Colors.blue.withValues(alpha: 0.22),
-                          borderRadius: BorderRadius.circular(5),
-                          border: Border.all(
-                            color: (isAudio ? Colors.orange : Colors.blue)
-                                .withValues(alpha: 0.35),
-                            width: 0.8,
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isAudio
-                                  ? Icons.music_note_rounded
-                                  : Icons.videocam_rounded,
-                              color: isAudio ? Colors.orange : Colors.blue,
-                              size: 11,
+                          decoration: BoxDecoration(
+                            color: isAudio
+                                ? Colors.orange.withValues(alpha: 0.22)
+                                : Colors.blue.withValues(alpha: 0.22),
+                            borderRadius: BorderRadius.circular(5),
+                            border: Border.all(
+                              color: (isAudio ? Colors.orange : Colors.blue)
+                                  .withValues(alpha: 0.35),
+                              width: 0.8,
                             ),
-                            const SizedBox(width: 3),
-                            Text(
-                              isAudio ? 'SONG' : 'VIDEO',
-                              style: TextStyle(
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isAudio
+                                    ? Icons.music_note_rounded
+                                    : Icons.videocam_rounded,
                                 color: isAudio ? Colors.orange : Colors.blue,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.6,
+                                size: 11,
                               ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.artist ?? (isAudio ? 'Audio track' : 'Video file'),
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.65),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
+                              const SizedBox(width: 3),
+                              Text(
+                                isAudio ? 'SONG' : 'VIDEO',
+                                style: TextStyle(
+                                  color: isAudio ? Colors.orange : Colors.blue,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 0.6,
+                                ),
+                              ),
+                            ],
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                trailing: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.12),
-                      width: 1,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            item.artist ??
+                                (isAudio ? 'Audio track' : 'Video file'),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.65),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 22,
+                  trailing: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.12),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.play_arrow_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
                   ),
+                  onTap: () => _playHistoryItem(item),
                 ),
-                onTap: () => _playHistoryItem(item),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildHistoryMeshGradient(bool isAudio) {
     final accentColor = isAudio ? Colors.orange : Colors.blue;
@@ -553,8 +559,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 
-
-
   Future<void> _playHistoryItem(MediaItem item) async {
     if (item.type == MediaType.audio) {
       // 1. Immediately inform PlaybackManager that active media is now this song
@@ -568,8 +572,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
 
       // 3. Update queue so next/previous buttons work
       final queue = QueueService().queue;
-      final existingIndex =
-          queue.indexWhere((m) => m.id == item.id || m.path == item.path);
+      final existingIndex = queue.indexWhere(
+        (m) => m.id == item.id || m.path == item.path,
+      );
       if (existingIndex >= 0) {
         QueueService().setCurrentIndex(existingIndex);
       } else {
@@ -659,9 +664,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           child: Stack(
             children: [
               // 1. Color-graded illuminated ambient glow matching the app UI
-              Positioned.fill(
-                child: _buildMeshGradient(color),
-              ),
+              Positioned.fill(child: _buildMeshGradient(color)),
 
               // 2. Crystal glass dark frosted tint overlay
               Positioned.fill(
@@ -832,7 +835,8 @@ class _HistoryThumbnailState extends State<_HistoryThumbnail> {
   void _checkCacheAndLoad() {
     final item = widget.item;
     if (item.type == MediaType.audio) {
-      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+      if (item.thumbnailPath != null &&
+          File(item.thumbnailPath!).existsSync()) {
         return;
       }
       final cached = ThumbnailService.getCachedAudioThumbnail(item.path);
@@ -846,7 +850,8 @@ class _HistoryThumbnailState extends State<_HistoryThumbnail> {
         }
       });
     } else {
-      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+      if (item.thumbnailPath != null &&
+          File(item.thumbnailPath!).existsSync()) {
         return;
       }
       final cached = ThumbnailService.getCachedVideoThumbnail(item.path);
@@ -866,7 +871,8 @@ class _HistoryThumbnailState extends State<_HistoryThumbnail> {
   Widget build(BuildContext context) {
     final item = widget.item;
     if (item.type == MediaType.audio) {
-      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+      if (item.thumbnailPath != null &&
+          File(item.thumbnailPath!).existsSync()) {
         return _buildThumbContainer(
           Image.file(
             File(item.thumbnailPath!),
@@ -909,7 +915,8 @@ class _HistoryThumbnailState extends State<_HistoryThumbnail> {
         ),
       );
     } else {
-      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+      if (item.thumbnailPath != null &&
+          File(item.thumbnailPath!).existsSync()) {
         return _buildThumbContainer(
           Image.file(
             File(item.thumbnailPath!),
@@ -951,10 +958,7 @@ class _HistoryThumbnailState extends State<_HistoryThumbnail> {
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(10),
-        child: child,
-      ),
+      child: ClipRRect(borderRadius: BorderRadius.circular(10), child: child),
     );
   }
 
