@@ -552,11 +552,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (index == 0) return screen;
     return Builder(
       builder: (context) {
-        final double topPadding =
-            MediaQuery.of(context).padding.top + kToolbarHeight + 8;
+        final double topPadding = MediaQuery.of(context).padding.top + 5;
         return Padding(
           padding: EdgeInsets.only(top: topPadding),
-          child: screen,
+          child: MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            child: screen,
+          ),
         );
       },
     );

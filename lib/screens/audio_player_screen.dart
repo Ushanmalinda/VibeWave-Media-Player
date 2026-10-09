@@ -503,32 +503,29 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              _buildHeader(),
-              Expanded(
-                child: _isLoading
-                    ? _buildLoadingView()
-                    : _isInFolderView
-                    ? _buildFoldersView()
-                    : _buildPlaylistView(),
-              ),
-            ],
-          ),
-          if (_currentIndex >= 0) _buildMiniPlayer(),
-          if (_showFullPlayer && _currentIndex >= 0) _buildFullPlayer(),
-        ],
-      ),
+    return Stack(
+      children: [
+        Column(
+          children: [
+            _buildHeader(),
+            Expanded(
+              child: _isLoading
+                  ? _buildLoadingView()
+                  : _isInFolderView
+                  ? _buildFoldersView()
+                  : _buildPlaylistView(),
+            ),
+          ],
+        ),
+        if (_currentIndex >= 0) _buildMiniPlayer(),
+        if (_showFullPlayer && _currentIndex >= 0) _buildFullPlayer(),
+      ],
     );
   }
 
   Widget _buildHeader() {
     return Container(
-      margin: const EdgeInsets.fromLTRB(14, 4, 14, 8),
+      margin: const EdgeInsets.fromLTRB(14, 0, 14, 8),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: const Color(0xFF181818).withValues(alpha: 0.85),
