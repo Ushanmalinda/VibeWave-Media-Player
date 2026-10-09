@@ -29,6 +29,12 @@ class PlaybackHistoryService extends ChangeNotifier {
         } catch (_) {}
       }
 
+      // Limit to 5 items and save if trimmed
+      if (_history.length > 5) {
+        _history.removeRange(5, _history.length);
+        await _save();
+      }
+
       // If history is still empty, seed it with last played item if available
       if (_history.isEmpty) {
         final last = await LastPlayedService.loadLastPlayed();
@@ -57,9 +63,9 @@ class PlaybackHistoryService extends ChangeNotifier {
       _history.removeWhere((i) => i.id == item.id || i.path == item.path);
       // Insert at the front
       _history.insert(0, item);
-      // Limit to 30 items
-      if (_history.length > 30) {
-        _history.removeRange(30, _history.length);
+      // Limit to 5 items, dropping older items
+      if (_history.length > 5) {
+        _history.removeRange(5, _history.length);
       }
       await _save();
       notifyListeners();

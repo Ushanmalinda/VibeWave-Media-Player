@@ -351,8 +351,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         );
       }
 
-    // Show up to 10 recent items
-    final displayItems = history.take(10).toList();
+    // Show only the last 5 recent items
+    final displayItems = history.take(5).toList();
 
     return RepaintBoundary(
       child: Column(
