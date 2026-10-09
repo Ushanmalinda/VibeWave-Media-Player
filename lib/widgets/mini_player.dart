@@ -1309,54 +1309,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
   Widget _buildAudioProgress() {
-    return StreamBuilder<Duration>(
-      stream: widget.audioPlayer.positionStream,
-      builder: (context, snapshot) {
-        final position = snapshot.data ?? Duration.zero;
-        final duration = widget.audioPlayer.duration ?? Duration.zero;
-        final progress = duration.inMilliseconds > 0
-            ? position.inMilliseconds / duration.inMilliseconds
-            : 0.0;
-
-        return Column(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: LinearProgressIndicator(
-                value: progress.clamp(0.0, 1.0),
-                backgroundColor: Colors.white.withValues(alpha: 0.12),
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  Colors.orange.withValues(alpha: 0.95),
-                ),
-                minHeight: 4,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  _formatDuration(position),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  _formatDuration(duration),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.6),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        );
-      },
-    );
+    return _MiniAudioTimeline(audioPlayer: widget.audioPlayer);
   }
 
 
@@ -1563,5 +1516,190 @@ class _MiniPlayerState extends State<MiniPlayer> {
     final minutes = duration.inMinutes.remainder(60);
     final seconds = duration.inSeconds.remainder(60);
     return '${twoDigits(minutes)}:${twoDigits(seconds)}';
+  }
+}
+
+class _MiniAudioTimeline extends StatefulWidget {
+  final AudioPlayer audioPlayer;
+
+  const _MiniAudioTimeline({required this.audioPlayer});
+
+  @override
+  State<_MiniAudioTimeline> createState() => _MiniAudioTimelineState();
+}
+
+class _MiniAudioTimelineState extends State<_MiniAudioTimeline> {
+  bool _isDragging = false;
+  double _dragFraction = 0.0;
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, '0');
+    final minutes = duration.inMinutes.remainder(60);
+    final seconds = duration.inSeconds.remainder(60);
+    return '${twoDigits(minutes)}:${twoDigits(seconds)}';
+  }
+
+  void _seekToFraction(double fraction) {
+    final duration = widget.audioPlayer.duration ?? Duration.zero;
+    if (duration > Duration.zero) {
+      final targetMs =
+          (fraction.clamp(0.0, 1.0) * duration.inMilliseconds).round();
+      final target = Duration(milliseconds: targetMs);
+      widget.audioPlayer.seek(target);
+      PlaybackManager().updatePosition(target);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<Duration>(
+      stream: widget.audioPlayer.positionStream,
+      builder: (context, snapshot) {
+        final position = snapshot.data ?? Duration.zero;
+        final duration = widget.audioPlayer.duration ?? Duration.zero;
+        final realProgress = duration.inMilliseconds > 0
+            ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+            : 0.0;
+        final displayFraction = _isDragging ? _dragFraction : realProgress;
+        final displayPosition = _isDragging
+            ? Duration(
+                milliseconds:
+                    (displayFraction * duration.inMilliseconds).round(),
+              )
+            : position;
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth;
+
+            return GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (details) {
+                if (trackWidth > 0) {
+                  final fraction =
+                      (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                  _seekToFraction(fraction);
+                }
+              },
+              onHorizontalDragStart: (details) {
+                if (trackWidth > 0) {
+                  setState(() {
+                    _isDragging = true;
+                    _dragFraction =
+                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                  });
+                }
+              },
+              onHorizontalDragUpdate: (details) {
+                if (trackWidth > 0) {
+                  setState(() {
+                    _dragFraction =
+                        (details.localPosition.dx / trackWidth).clamp(0.0, 1.0);
+                  });
+                }
+              },
+              onHorizontalDragEnd: (details) {
+                if (_isDragging) {
+                  _seekToFraction(_dragFraction);
+                  setState(() {
+                    _isDragging = false;
+                  });
+                }
+              },
+              onHorizontalDragCancel: () {
+                if (_isDragging) {
+                  setState(() {
+                    _isDragging = false;
+                  });
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Generous vertical touch area for effortless tapping/scrubbing
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: SizedBox(
+                      height: 12,
+                      width: trackWidth,
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        alignment: Alignment.centerLeft,
+                        children: [
+                          // Background track
+                          Container(
+                            height: 4,
+                            width: trackWidth,
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          // Active progress track
+                          Container(
+                            height: 4,
+                            width: (displayFraction * trackWidth)
+                                .clamp(0.0, trackWidth),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withValues(alpha: 0.95),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                          ),
+                          // Thumb handle indicator
+                          Positioned(
+                            left: ((displayFraction * trackWidth) - 5)
+                                .clamp(0.0, (trackWidth - 10).clamp(0.0, double.infinity)),
+                            child: Container(
+                              width: 10,
+                              height: 10,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white,
+                                border: Border.all(
+                                  color: Colors.orange,
+                                  width: 2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.orange.withValues(alpha: 0.45),
+                                    blurRadius: 4,
+                                    spreadRadius: 1,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _formatDuration(displayPosition),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      Text(
+                        _formatDuration(duration),
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 }
