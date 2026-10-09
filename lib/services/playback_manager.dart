@@ -37,12 +37,14 @@ class PlaybackManager extends ChangeNotifier {
 
   void updatePosition(Duration position) {
     _position = position;
-    notifyListeners();
+    // Avoid notifyListeners() here: position ticks fire 20 times/sec and would cause 20 full-screen rebuilds/sec
   }
 
   void updateDuration(Duration duration) {
-    _duration = duration;
-    notifyListeners();
+    if (_duration != duration) {
+      _duration = duration;
+      notifyListeners();
+    }
   }
 
   void clearPlayback() {

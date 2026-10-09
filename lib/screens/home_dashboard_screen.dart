@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../models/media_item.dart';
@@ -33,15 +32,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   int _audioCount = 0;
   int _videoCount = 0;
   int _favoritesCount = 0;
-  MediaItem? _sampleAudioItem;
-  MediaItem? _sampleVideoItem;
   bool _isLoadingMedia = true;
   final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _playbackManager.addListener(_onPlaybackChanged);
     _favoritesService.addListener(_onFavoritesChanged);
     _historyService.addListener(_onHistoryChanged);
     _requestPermissionsEarly();
@@ -59,23 +55,15 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
       final audioFolders = await MediaScanner.scanAudioFiles();
       final videoFolders = await MediaScanner.scanVideoFiles();
 
-      // Count total files and grab sample items for glass backgrounds
+      // Count total files
       int totalAudioFiles = 0;
-      MediaItem? sampleAudio;
       for (var folder in audioFolders) {
         totalAudioFiles += folder.mediaFiles.length;
-        if (sampleAudio == null && folder.mediaFiles.isNotEmpty) {
-          sampleAudio = folder.mediaFiles.first;
-        }
       }
 
       int totalVideoFiles = 0;
-      MediaItem? sampleVideo;
       for (var folder in videoFolders) {
         totalVideoFiles += folder.mediaFiles.length;
-        if (sampleVideo == null && folder.mediaFiles.isNotEmpty) {
-          sampleVideo = folder.mediaFiles.first;
-        }
       }
 
       await _favoritesService.initialize();
@@ -90,8 +78,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         setState(() {
           _audioCount = totalAudioFiles;
           _videoCount = totalVideoFiles;
-          _sampleAudioItem = sampleAudio;
-          _sampleVideoItem = sampleVideo;
           _favoritesCount = _favoritesService.favoriteIds.length;
           _isLoadingMedia = false;
         });
@@ -108,14 +94,9 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
-    _playbackManager.removeListener(_onPlaybackChanged);
     _favoritesService.removeListener(_onFavoritesChanged);
     _historyService.removeListener(_onHistoryChanged);
     super.dispose();
-  }
-
-  void _onPlaybackChanged() {
-    if (mounted) setState(() {});
   }
 
   void _onFavoritesChanged() {
@@ -134,106 +115,102 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       controller: _scrollController,
+      physics: const BouncingScrollPhysics(
+        parent: AlwaysScrollableScrollPhysics(),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Now Playing section
+            // Now Playing section (isolated with RepaintBoundary so playback ticks don't repaint dashboard)
             const SizedBox(height: 12),
-            MiniPlayer(
-              audioPlayer: AudioPlayerService().player,
-              onTap: () {
-                final current = _playbackManager.currentlyPlaying ??
-                    _historyService.history.firstOrNull;
-                if (current != null && current.type == MediaType.video) {
+            RepaintBoundary(
+              child: MiniPlayer(
+                audioPlayer: AudioPlayerService().player,
+                onTap: () {
+                  final current = _playbackManager.currentlyPlaying ??
+                      _historyService.history.firstOrNull;
+                  if (current != null && current.type == MediaType.video) {
+                    VideoPlayerScreen.playExternalVideo(
+                      current,
+                      autoFullScreen: true,
+                      openedFromExternal: true,
+                    );
+                  } else {
+                    widget.onNavigate?.call(1);
+                  }
+                },
+                onPlayVideo: (video) {
                   VideoPlayerScreen.playExternalVideo(
-                    current,
+                    video,
                     autoFullScreen: true,
                     openedFromExternal: true,
                   );
-                } else {
-                  widget.onNavigate?.call(1);
-                }
-              },
-              onPlayVideo: (video) {
-                VideoPlayerScreen.playExternalVideo(
-                  video,
-                  autoFullScreen: true,
-                  openedFromExternal: true,
-                );
-              },
+                },
+              ),
             ),
             const SizedBox(height: 24),
 
-            // Quick access section
+            // Quick access section (isolated with RepaintBoundary for 60/120fps scrolling)
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickAccessCard(
-                    icon: Icons.music_note_rounded,
-                    title: 'Music',
-                    subtitle:
-                        '$_audioCount ${_audioCount == 1 ? 'song' : 'songs'}',
-                    color: Colors.orange,
-                    backgroundMedia:
-                        _historyService.history
-                            .where((m) => m.type == MediaType.audio)
-                            .firstOrNull ??
-                        _sampleAudioItem,
-                    isLoading: _isLoadingMedia,
-                    onTap: () => widget.onNavigate?.call(1),
+            RepaintBoundary(
+              child: Column(
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickAccessCard(
+                          icon: Icons.music_note_rounded,
+                          title: 'Music',
+                          subtitle:
+                              '$_audioCount ${_audioCount == 1 ? 'song' : 'songs'}',
+                          color: Colors.orange,
+                          isLoading: _isLoadingMedia,
+                          onTap: () => widget.onNavigate?.call(1),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildQuickAccessCard(
+                          icon: Icons.video_library_rounded,
+                          title: 'Videos',
+                          subtitle:
+                              '$_videoCount ${_videoCount == 1 ? 'video' : 'videos'}',
+                          color: Colors.blue,
+                          isLoading: _isLoadingMedia,
+                          onTap: () => widget.onNavigate?.call(2),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildQuickAccessCard(
-                    icon: Icons.video_library_rounded,
-                    title: 'Videos',
-                    subtitle:
-                        '$_videoCount ${_videoCount == 1 ? 'video' : 'videos'}',
-                    color: Colors.blue,
-                    backgroundMedia:
-                        _historyService.history
-                            .where((m) => m.type == MediaType.video)
-                            .firstOrNull ??
-                        _sampleVideoItem,
-                    isLoading: _isLoadingMedia,
-                    onTap: () => widget.onNavigate?.call(2),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildQuickAccessCard(
+                          icon: Icons.favorite_rounded,
+                          title: 'Favorites',
+                          subtitle:
+                              '$_favoritesCount ${_favoritesCount == 1 ? 'favorite' : 'favorites'}',
+                          color: Colors.red,
+                          onTap: () => widget.onNavigate?.call(5),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildQuickAccessCard(
+                          icon: Icons.queue_music_rounded,
+                          title: 'Queue',
+                          subtitle: 'Now playing',
+                          color: Colors.purple,
+                          onTap: () => widget.onNavigate?.call(6),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _buildQuickAccessCard(
-                    icon: Icons.favorite_rounded,
-                    title: 'Favorites',
-                    subtitle:
-                        '$_favoritesCount ${_favoritesCount == 1 ? 'favorite' : 'favorites'}',
-                    color: Colors.red,
-                    backgroundMedia:
-                        _favoritesService.favoriteItems.firstOrNull,
-                    onTap: () => widget.onNavigate?.call(5),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _buildQuickAccessCard(
-                    icon: Icons.queue_music_rounded,
-                    title: 'Queue',
-                    subtitle: 'Now playing',
-                    color: Colors.purple,
-                    backgroundMedia:
-                        _playbackManager.currentlyPlaying ??
-                        QueueService().queue.firstOrNull,
-                    onTap: () => widget.onNavigate?.call(6),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -325,14 +302,12 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(18),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(18),
-              ),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 26, horizontal: 16),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(18),
+            ),
               child: Column(
                 children: [
                   Container(
@@ -373,61 +348,63 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               ),
             ),
           ),
-        ),
-      );
-    }
+        );
+      }
 
     // Show up to 10 recent items
     final displayItems = history.take(10).toList();
 
-    return Column(
-      children: displayItems.map((item) => _buildHistoryItem(item)).toList(),
+    return RepaintBoundary(
+      child: Column(
+        children: displayItems.map((item) => _buildHistoryItem(item)).toList(),
+      ),
     );
   }
 
   Widget _buildHistoryItem(MediaItem item) {
     final isAudio = item.type == MediaType.audio;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: Colors.white.withValues(alpha: 0.14),
-          width: 1.2,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.35),
-            blurRadius: 14,
-            offset: const Offset(0, 5),
+    return RepaintBoundary(
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.14),
+            width: 1.2,
           ),
-          BoxShadow(
-            color: (isAudio ? Colors.orange : Colors.blue).withValues(
-              alpha: 0.08,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.35),
+              blurRadius: 14,
+              offset: const Offset(0, 5),
             ),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: Stack(
-          children: [
-            // 1. Current song/video background artwork
-            Positioned.fill(child: _buildHistoryBackground(item)),
+            BoxShadow(
+              color: (isAudio ? Colors.orange : Colors.blue).withValues(
+                alpha: 0.08,
+              ),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Stack(
+            children: [
+              // 1. Color-graded ambient glow matching application UI (orange for songs, blue for videos)
+              Positioned.fill(
+                child: _buildHistoryMeshGradient(isAudio),
+              ),
 
-            // 2. Crystal glass blur & dark frosted tint overlay
-            Positioned.fill(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              // 2. Crystal glass dark frosted tint overlay
+              Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        const Color(0xFF141414).withValues(alpha: 0.68),
-                        const Color(0xFF0A0A0A).withValues(alpha: 0.84),
+                        const Color(0xFF161616).withValues(alpha: 0.65),
+                        const Color(0xFF0A0A0A).withValues(alpha: 0.82),
                       ],
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
@@ -435,33 +412,32 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   ),
                 ),
               ),
-            ),
 
-            // 3. Crystal glass specular top shine
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      Colors.white.withValues(alpha: 0.08),
-                      Colors.transparent,
-                    ],
-                    begin: Alignment.topCenter,
-                    end: Alignment.center,
+              // 3. Crystal glass specular top shine
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.08),
+                        Colors.transparent,
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.center,
+                    ),
                   ),
                 ),
               ),
-            ),
 
-            // 4. Foreground content ListTile wrapped in Material for ripple / ink splashes
-            Material(
-              color: Colors.transparent,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 6,
-                ),
-                leading: _buildHistoryThumbnail(item),
+              // 4. Foreground content ListTile wrapped in Material for ripple / ink splashes
+              Material(
+                color: Colors.transparent,
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 6,
+                  ),
+                  leading: _HistoryThumbnail(item: item),
                 title: Text(
                   item.title,
                   style: const TextStyle(
@@ -555,171 +531,29 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  Widget _buildHistoryBackground(MediaItem item) {
-    if (item.type == MediaType.audio) {
-      if (item.thumbnailPath != null &&
-          File(item.thumbnailPath!).existsSync()) {
-        return Image.file(
-          File(item.thumbnailPath!),
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-        );
-      }
-      return FutureBuilder<Uint8List?>(
-        future: ThumbnailService.getAudioThumbnail(item.path),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            return Image.memory(
-              snapshot.data!,
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-            );
-          }
-          return Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF2A1B0E), Color(0xFF141414)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-          );
-        },
-      );
-    } else {
-      return FutureBuilder<String?>(
-        future: ThumbnailService.getVideoThumbnail(item.path),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            return Image.file(
-              File(snapshot.data!),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              errorBuilder: (_, __, ___) => _defaultVideoBg(),
-            );
-          }
-          return _defaultVideoBg();
-        },
-      );
-    }
-  }
-
-  Widget _defaultVideoBg() {
+  Widget _buildHistoryMeshGradient(bool isAudio) {
+    final accentColor = isAudio ? Colors.orange : Colors.blue;
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Color(0xFF0E1E2A), Color(0xFF141414)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHistoryThumbnail(MediaItem item) {
-    if (item.type == MediaType.audio) {
-      return FutureBuilder<Uint8List?>(
-        future: ThumbnailService.getAudioThumbnail(item.path),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            return Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.memory(
-                  snapshot.data!,
-                  width: 50,
-                  height: 50,
-                  fit: BoxFit.cover,
-                ),
-              ),
-            );
-          }
-          return Container(
-            width: 50,
-            height: 50,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Colors.orange.withValues(alpha: 0.35),
-                  Colors.orange.withValues(alpha: 0.15),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.music_note_rounded,
-              color: Colors.orange,
-              size: 24,
-            ),
-          );
-        },
-      );
-    } else {
-      return FutureBuilder<String?>(
-        future: ThumbnailService.getVideoThumbnail(item.path),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            return Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.3),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
-                child: Image.file(
-                  File(snapshot.data!),
-                  width: 50,
-                  height: 50,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => _defaultVideoThumb(),
-                ),
-              ),
-            );
-          }
-          return _defaultVideoThumb();
-        },
-      );
-    }
-  }
-
-  Widget _defaultVideoThumb() {
-    return Container(
-      width: 50,
-      height: 50,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: RadialGradient(
+          center: const Alignment(-0.85, -0.1),
+          radius: 1.5,
           colors: [
-            Colors.blue.withValues(alpha: 0.35),
-            Colors.blue.withValues(alpha: 0.15),
+            accentColor.withValues(alpha: 0.22),
+            accentColor.withValues(alpha: 0.05),
+            const Color(0xFF111111),
           ],
+          stops: const [0.0, 0.45, 1.0],
         ),
-        borderRadius: BorderRadius.circular(10),
       ),
-      child: const Icon(Icons.videocam_rounded, color: Colors.blue, size: 24),
     );
   }
+
+
 
   Future<void> _playHistoryItem(MediaItem item) async {
     if (item.type == MediaType.audio) {
@@ -796,7 +630,6 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     required String subtitle,
     required Color color,
     VoidCallback? onTap,
-    MediaItem? backgroundMedia,
     bool isLoading = false,
   }) {
     return GestureDetector(
@@ -815,8 +648,8 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
               offset: const Offset(0, 5),
             ),
             BoxShadow(
-              color: color.withValues(alpha: 0.08),
-              blurRadius: 8,
+              color: color.withValues(alpha: 0.12),
+              blurRadius: 10,
               offset: const Offset(0, 2),
             ),
           ],
@@ -825,25 +658,22 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
           borderRadius: BorderRadius.circular(18),
           child: Stack(
             children: [
-              // 1. Background: Real media artwork or illuminated Apple glowing mesh gradient
+              // 1. Color-graded illuminated ambient glow matching the app UI
               Positioned.fill(
-                child: _buildQuickAccessBackground(backgroundMedia, color),
+                child: _buildMeshGradient(color),
               ),
 
-              // 2. Crystal glass blur & dark frosted tint overlay
+              // 2. Crystal glass dark frosted tint overlay
               Positioned.fill(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF141414).withValues(alpha: 0.65),
-                          const Color(0xFF0A0A0A).withValues(alpha: 0.82),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF161616).withValues(alpha: 0.60),
+                        const Color(0xFF0A0A0A).withValues(alpha: 0.78),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
                     ),
                   ),
                 ),
@@ -855,7 +685,7 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.white.withValues(alpha: 0.08),
+                        Colors.white.withValues(alpha: 0.10),
                         Colors.transparent,
                       ],
                       begin: Alignment.topCenter,
@@ -954,67 +784,194 @@ class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
     );
   }
 
-  Widget _buildQuickAccessBackground(MediaItem? media, Color color) {
-    if (media != null) {
-      if (media.type == MediaType.audio) {
-        if (media.thumbnailPath != null &&
-            File(media.thumbnailPath!).existsSync()) {
-          return Image.file(
-            File(media.thumbnailPath!),
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-          );
-        }
-        return FutureBuilder<Uint8List?>(
-          future: ThumbnailService.getAudioThumbnail(media.path),
-          builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data != null) {
-              return Image.memory(
-                snapshot.data!,
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-              );
-            }
-            return _buildMeshGradient(color);
-          },
-        );
-      } else {
-        return FutureBuilder<String?>(
-          future: ThumbnailService.getVideoThumbnail(media.path),
-          builder: (context, snapshot) {
-            if (snapshot.hasData && snapshot.data != null) {
-              return Image.file(
-                File(snapshot.data!),
-                fit: BoxFit.cover,
-                width: double.infinity,
-                height: double.infinity,
-                errorBuilder: (_, __, ___) => _buildMeshGradient(color),
-              );
-            }
-            return _buildMeshGradient(color);
-          },
-        );
-      }
-    }
-    return _buildMeshGradient(color);
-  }
-
   Widget _buildMeshGradient(Color color) {
     return Container(
       decoration: BoxDecoration(
         gradient: RadialGradient(
-          center: const Alignment(-0.3, -0.4),
-          radius: 1.2,
+          center: const Alignment(-0.35, -0.45),
+          radius: 1.3,
           colors: [
-            color.withValues(alpha: 0.50),
-            color.withValues(alpha: 0.18),
+            color.withValues(alpha: 0.45),
+            color.withValues(alpha: 0.15),
             const Color(0xFF101010),
           ],
-          stops: const [0.0, 0.5, 1.0],
+          stops: const [0.0, 0.52, 1.0],
         ),
       ),
+    );
+  }
+}
+
+class _HistoryThumbnail extends StatefulWidget {
+  final MediaItem item;
+
+  const _HistoryThumbnail({required this.item});
+
+  @override
+  State<_HistoryThumbnail> createState() => _HistoryThumbnailState();
+}
+
+class _HistoryThumbnailState extends State<_HistoryThumbnail> {
+  Uint8List? _audioThumb;
+  String? _videoThumb;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkCacheAndLoad();
+  }
+
+  @override
+  void didUpdateWidget(_HistoryThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.path != widget.item.path) {
+      _checkCacheAndLoad();
+    }
+  }
+
+  void _checkCacheAndLoad() {
+    final item = widget.item;
+    if (item.type == MediaType.audio) {
+      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+        return;
+      }
+      final cached = ThumbnailService.getCachedAudioThumbnail(item.path);
+      if (cached != null) {
+        _audioThumb = cached;
+        return;
+      }
+      ThumbnailService.getAudioThumbnail(item.path).then((data) {
+        if (mounted && data != null) {
+          setState(() => _audioThumb = data);
+        }
+      });
+    } else {
+      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+        return;
+      }
+      final cached = ThumbnailService.getCachedVideoThumbnail(item.path);
+      if (cached != null) {
+        _videoThumb = cached;
+        return;
+      }
+      ThumbnailService.getVideoThumbnail(item.path).then((path) {
+        if (mounted && path != null) {
+          setState(() => _videoThumb = path);
+        }
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final item = widget.item;
+    if (item.type == MediaType.audio) {
+      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+        return _buildThumbContainer(
+          Image.file(
+            File(item.thumbnailPath!),
+            width: 50,
+            height: 50,
+            cacheWidth: 100,
+            cacheHeight: 100,
+            fit: BoxFit.cover,
+          ),
+        );
+      }
+      if (_audioThumb != null) {
+        return _buildThumbContainer(
+          Image.memory(
+            _audioThumb!,
+            width: 50,
+            height: 50,
+            cacheWidth: 100,
+            cacheHeight: 100,
+            fit: BoxFit.cover,
+          ),
+        );
+      }
+      return Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.orange.withValues(alpha: 0.35),
+              Colors.orange.withValues(alpha: 0.15),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(
+          Icons.music_note_rounded,
+          color: Colors.orange,
+          size: 24,
+        ),
+      );
+    } else {
+      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
+        return _buildThumbContainer(
+          Image.file(
+            File(item.thumbnailPath!),
+            width: 50,
+            height: 50,
+            cacheWidth: 100,
+            cacheHeight: 100,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _defaultVideoThumb(),
+          ),
+        );
+      }
+      if (_videoThumb != null && File(_videoThumb!).existsSync()) {
+        return _buildThumbContainer(
+          Image.file(
+            File(_videoThumb!),
+            width: 50,
+            height: 50,
+            cacheWidth: 100,
+            cacheHeight: 100,
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => _defaultVideoThumb(),
+          ),
+        );
+      }
+      return _defaultVideoThumb();
+    }
+  }
+
+  Widget _buildThumbContainer(Widget child) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _defaultVideoThumb() {
+    return Container(
+      width: 50,
+      height: 50,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.blue.withValues(alpha: 0.35),
+            Colors.blue.withValues(alpha: 0.15),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Icon(Icons.videocam_rounded, color: Colors.blue, size: 24),
     );
   }
 }

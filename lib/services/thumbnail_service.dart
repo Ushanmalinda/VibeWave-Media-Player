@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:isolate';
 import 'dart:typed_data';
 import 'package:get_thumbnail_video/index.dart';
 import 'package:get_thumbnail_video/video_thumbnail.dart';
@@ -11,6 +12,20 @@ class ThumbnailService {
   // Cache for audio thumbnails to prevent reloading
   static final Map<String, Uint8List?> _audioThumbnailCache = {};
   static final Map<String, String?> _audioThumbnailPathCache = {};
+  static final Map<String, Future<Uint8List?>> _audioThumbnailInFlight = {};
+
+  /// Synchronous memory cache query for zero-delay frame-1 rendering
+  static Uint8List? getCachedAudioThumbnail(String audioPath) =>
+      _audioThumbnailCache[audioPath];
+
+  static bool hasCachedAudioThumbnail(String audioPath) =>
+      _audioThumbnailCache.containsKey(audioPath);
+
+  static String? getCachedVideoThumbnail(String videoPath) =>
+      _videoThumbnailCache[videoPath];
+
+  static bool hasCachedVideoThumbnail(String videoPath) =>
+      _videoThumbnailCache.containsKey(videoPath);
 
   static Future<Uint8List?> getAudioThumbnail(String audioPath) async {
     // Return cached thumbnail if available
@@ -18,28 +33,51 @@ class ThumbnailService {
       return _audioThumbnailCache[audioPath];
     }
 
+    // Reuse in-flight request if already loading
+    if (_audioThumbnailInFlight.containsKey(audioPath)) {
+      return _audioThumbnailInFlight[audioPath]!;
+    }
+
+    final future = _loadAudioThumbnail(audioPath);
+    _audioThumbnailInFlight[audioPath] = future;
+
+    try {
+      final thumbnail = await future;
+      if (_audioThumbnailCache.length > 80) {
+        _audioThumbnailCache.remove(_audioThumbnailCache.keys.first);
+      }
+      _audioThumbnailCache[audioPath] = thumbnail;
+      return thumbnail;
+    } catch (_) {
+      _audioThumbnailCache[audioPath] = null;
+      return null;
+    } finally {
+      _audioThumbnailInFlight.remove(audioPath);
+    }
+  }
+
+  static Future<Uint8List?> _loadAudioThumbnail(String audioPath) async {
     try {
       final audioFile = File(audioPath);
       if (!await audioFile.exists()) {
-        _audioThumbnailCache[audioPath] = null;
         return null;
       }
 
-      // Read audio metadata including artwork
-      final metadata = readMetadata(audioFile, getImage: true);
-
-      if (metadata.pictures.isNotEmpty) {
-        // Cache and return the first picture (album art)
-        final thumbnail = metadata.pictures.first.bytes;
-        _audioThumbnailCache[audioPath] = thumbnail;
-        return thumbnail;
-      }
-
-      _audioThumbnailCache[audioPath] = null;
-      return null;
-    } catch (e) {
-      // Silently handle errors - some files may have corrupted metadata
-      _audioThumbnailCache[audioPath] = null;
+      // Read audio metadata in a background isolate to keep the UI thread silky-smooth
+      return await Isolate.run(() {
+        try {
+          final file = File(audioPath);
+          if (!file.existsSync()) return null;
+          final metadata = readMetadata(file, getImage: true);
+          if (metadata.pictures.isNotEmpty) {
+            return metadata.pictures.first.bytes;
+          }
+          return null;
+        } catch (_) {
+          return null;
+        }
+      });
+    } catch (_) {
       return null;
     }
   }

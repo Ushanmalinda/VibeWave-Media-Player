@@ -658,15 +658,22 @@ class _VibeWaveAppBar extends StatelessWidget implements PreferredSizeWidget {
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(28),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-            child: Container(
-              height: kToolbarHeight - 2,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: selectedIndex == 0 && !isSearching
-                  ? _buildHomeHeader(context)
-                  : _buildStandardHeader(context),
+          child: Container(
+            height: kToolbarHeight - 2,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  Colors.white.withValues(alpha: 0.06),
+                  Colors.transparent,
+                ],
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+              ),
             ),
+            child: selectedIndex == 0 && !isSearching
+                ? _buildHomeHeader(context)
+                : _buildStandardHeader(context),
           ),
         ),
       ),

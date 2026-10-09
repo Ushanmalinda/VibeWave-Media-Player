@@ -1396,7 +1396,13 @@ class _VideoThumbnailState extends State<VideoThumbnail> {
   @override
   void initState() {
     super.initState();
-    _loadThumbnail();
+    final cached = ThumbnailService.getCachedVideoThumbnail(widget.videoPath);
+    if (cached != null || ThumbnailService.hasCachedVideoThumbnail(widget.videoPath)) {
+      _thumbnailPath = cached;
+      _isLoading = false;
+    } else {
+      _loadThumbnail();
+    }
   }
 
   @override
@@ -1404,7 +1410,14 @@ class _VideoThumbnailState extends State<VideoThumbnail> {
     super.didUpdateWidget(oldWidget);
     // Only reload if the path changes
     if (oldWidget.videoPath != widget.videoPath) {
-      _loadThumbnail();
+      final cached = ThumbnailService.getCachedVideoThumbnail(widget.videoPath);
+      if (cached != null || ThumbnailService.hasCachedVideoThumbnail(widget.videoPath)) {
+        _thumbnailPath = cached;
+        _isLoading = false;
+      } else {
+        _isLoading = true;
+        _loadThumbnail();
+      }
     }
   }
 
@@ -1454,7 +1467,11 @@ class _VideoThumbnailState extends State<VideoThumbnail> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           image: DecorationImage(
-            image: FileImage(File(_thumbnailPath!)),
+            image: ResizeImage(
+              FileImage(File(_thumbnailPath!)),
+              width: (widget.size * 2).toInt(),
+              height: (widget.size * 2).toInt(),
+            ),
             fit: BoxFit.cover,
           ),
           boxShadow: [

@@ -278,10 +278,11 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
     });
 
     _audioPlayer.positionStream.listen((position) {
-      setState(() {
-        _position = position;
-      });
+      _position = position;
       _playbackManager.updatePosition(position);
+      if (_showFullPlayer && mounted) {
+        setState(() {});
+      }
     });
 
     _audioPlayer.playerStateStream.listen((state) {
@@ -938,14 +939,20 @@ class _AudioPlayerScreenState extends State<AudioPlayerScreen>
             children: [
               SizedBox(
                 height: 2,
-                child: LinearProgressIndicator(
-                  value: _duration.inSeconds > 0
-                      ? _position.inSeconds / _duration.inSeconds
-                      : 0,
-                  backgroundColor: Colors.white.withOpacity(0.1),
-                  valueColor: const AlwaysStoppedAnimation<Color>(
-                    Colors.orange,
-                  ),
+                child: StreamBuilder<Duration>(
+                  stream: _audioPlayer.positionStream,
+                  builder: (context, snapshot) {
+                    final pos = snapshot.data ?? _position;
+                    return LinearProgressIndicator(
+                      value: _duration.inSeconds > 0
+                          ? pos.inSeconds / _duration.inSeconds
+                          : 0,
+                      backgroundColor: Colors.white.withOpacity(0.1),
+                      valueColor: const AlwaysStoppedAnimation<Color>(
+                        Colors.orange,
+                      ),
+                    );
+                  },
                 ),
               ),
               Expanded(
@@ -1507,7 +1514,13 @@ class _AudioThumbnailState extends State<AudioThumbnail> {
   @override
   void initState() {
     super.initState();
-    _loadThumbnail();
+    final cached = ThumbnailService.getCachedAudioThumbnail(widget.audioPath);
+    if (cached != null || ThumbnailService.hasCachedAudioThumbnail(widget.audioPath)) {
+      _thumbnailData = cached;
+      _isLoading = false;
+    } else {
+      _loadThumbnail();
+    }
   }
 
   @override
@@ -1515,7 +1528,14 @@ class _AudioThumbnailState extends State<AudioThumbnail> {
     super.didUpdateWidget(oldWidget);
     // Only reload if the path changes
     if (oldWidget.audioPath != widget.audioPath) {
-      _loadThumbnail();
+      final cached = ThumbnailService.getCachedAudioThumbnail(widget.audioPath);
+      if (cached != null || ThumbnailService.hasCachedAudioThumbnail(widget.audioPath)) {
+        _thumbnailData = cached;
+        _isLoading = false;
+      } else {
+        _isLoading = true;
+        _loadThumbnail();
+      }
     }
   }
 
@@ -1565,7 +1585,11 @@ class _AudioThumbnailState extends State<AudioThumbnail> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           image: DecorationImage(
-            image: MemoryImage(_thumbnailData!),
+            image: ResizeImage(
+              MemoryImage(_thumbnailData!),
+              width: (widget.size * 2).toInt(),
+              height: (widget.size * 2).toInt(),
+            ),
             fit: BoxFit.cover,
           ),
           boxShadow: [

@@ -6,7 +6,6 @@ import 'package:path/path.dart' as p;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/media_item.dart';
 import '../models/folder_item.dart';
-import 'thumbnail_service.dart';
 
 class MediaScanner {
   static const platform = MethodChannel('com.example.media_player_app/storage');
@@ -367,18 +366,6 @@ class MediaScanner {
             final folderPath = p.normalize(p.dirname(canonicalFilePath));
             final title = p.basenameWithoutExtension(canonicalFilePath);
 
-            // Generate thumbnail path based on media type
-            String? thumbnailPath;
-            if (type == MediaType.audio) {
-              thumbnailPath = await ThumbnailService.getAudioThumbnailPath(
-                canonicalFilePath,
-              );
-            } else {
-              thumbnailPath = await ThumbnailService.getVideoThumbnail(
-                canonicalFilePath,
-              );
-            }
-
             final mediaItem = MediaItem(
               id: canonicalFilePath,
               title: title,
@@ -386,7 +373,7 @@ class MediaScanner {
               type: type,
               artist: _extractArtistFromPath(canonicalFilePath),
               album: p.basename(folderPath),
-              thumbnailPath: thumbnailPath,
+              thumbnailPath: null, // Generated lazily on-demand by UI widgets
             );
 
             folderMap.putIfAbsent(folderPath, () => []);

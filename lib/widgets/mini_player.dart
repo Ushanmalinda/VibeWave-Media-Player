@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:ui';
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -544,25 +543,30 @@ class _MiniPlayerState extends State<MiniPlayer> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E1E1E).withValues(alpha: 0.85),
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.12),
-                width: 1.2,
-              ),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFF222222).withValues(alpha: 0.90),
+                const Color(0xFF141414).withValues(alpha: 0.95),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            child: Row(
-              children: [
-                Container(
-                  width: 50,
-                  height: 50,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.12),
+              width: 1.2,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.10),
@@ -609,8 +613,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildMiniVideoPlayer(MediaItem item) {
@@ -689,36 +692,30 @@ class _MiniPlayerState extends State<MiniPlayer> {
                 Center(
                   child: GestureDetector(
                     onTap: _toggleVideoPlayPause,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(30),
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                        child: Container(
-                          width: 54,
-                          height: 54,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.black.withValues(alpha: 0.50),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.30),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.blue.withValues(alpha: 0.40),
-                                blurRadius: 14,
-                                spreadRadius: 1,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            isPlaying
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 34,
-                          ),
+                    child: Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.black.withValues(alpha: 0.65),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.35),
+                          width: 1.2,
                         ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.blue.withValues(alpha: 0.40),
+                            blurRadius: 14,
+                            spreadRadius: 1,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 34,
                       ),
                     ),
                   ),
@@ -1023,37 +1020,47 @@ class _MiniPlayerState extends State<MiniPlayer> {
           borderRadius: BorderRadius.circular(22),
           child: Stack(
             children: [
-              // 1. Current Media Background Image
+              // 1. Color-graded ambient glow matching application UI (orange for songs)
               Positioned.fill(
-                child: _buildMediaBackground(currentItem),
-              ),
-
-              // 2. Crystal Glass Blur & Tint Overlay (Apple Music frosted glass effect)
-              Positioned.fill(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 25, sigmaY: 25),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          const Color(0xFF141414).withValues(alpha: 0.65),
-                          const Color(0xFF0A0A0A).withValues(alpha: 0.82),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      center: const Alignment(-0.85, -0.2),
+                      radius: 1.5,
+                      colors: [
+                        accentColor.withValues(alpha: 0.22),
+                        accentColor.withValues(alpha: 0.05),
+                        const Color(0xFF111111),
+                      ],
+                      stops: const [0.0, 0.45, 1.0],
                     ),
                   ),
                 ),
               ),
 
-              // 3. Crystal Glass Specular Top Highlight
+              // 2. Crystal glass dark frosted tint overlay
               Positioned.fill(
                 child: Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        Colors.white.withValues(alpha: 0.08),
+                        const Color(0xFF161616).withValues(alpha: 0.65),
+                        const Color(0xFF0A0A0A).withValues(alpha: 0.82),
+                      ],
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                    ),
+                  ),
+                ),
+              ),
+
+              // 3. Crystal glass specular top shine
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Colors.white.withValues(alpha: 0.10),
                         Colors.transparent,
                       ],
                       begin: Alignment.topCenter,
@@ -1353,66 +1360,7 @@ class _MiniPlayerState extends State<MiniPlayer> {
   }
 
 
-  Widget _buildMediaBackground(MediaItem item) {
-    if (item.type == MediaType.video) {
-      if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
-        return Image.file(
-          File(item.thumbnailPath!),
-          fit: BoxFit.cover,
-          width: double.infinity,
-          height: double.infinity,
-          errorBuilder: (_, __, ___) => _defaultVideoBg(),
-        );
-      }
-      return FutureBuilder<String?>(
-        future: ThumbnailService.getVideoThumbnail(item.path),
-        builder: (context, snapshot) {
-          if (snapshot.hasData && snapshot.data != null) {
-            return Image.file(
-              File(snapshot.data!),
-              fit: BoxFit.cover,
-              width: double.infinity,
-              height: double.infinity,
-              errorBuilder: (_, __, ___) => _defaultVideoBg(),
-            );
-          }
-          return _defaultVideoBg();
-        },
-      );
-    }
 
-    if (item.thumbnailPath != null && File(item.thumbnailPath!).existsSync()) {
-      return Image.file(
-        File(item.thumbnailPath!),
-        fit: BoxFit.cover,
-        width: double.infinity,
-        height: double.infinity,
-      );
-    }
-
-    return FutureBuilder<Uint8List?>(
-      future: ThumbnailService.getAudioThumbnail(item.path),
-      builder: (context, snapshot) {
-        if (snapshot.hasData && snapshot.data != null) {
-          return Image.memory(
-            snapshot.data!,
-            fit: BoxFit.cover,
-            width: double.infinity,
-            height: double.infinity,
-          );
-        }
-        return Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              colors: [Color(0xFF2E1C0C), Color(0xFF141414)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   Widget _defaultVideoBg() {
     return Container(
@@ -1433,6 +1381,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
         File(item.thumbnailPath!),
         width: 58,
         height: 58,
+        cacheWidth: 120,
+        cacheHeight: 120,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _defaultVideoThumb(),
       );
@@ -1445,6 +1395,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
               File(snapshot.data!),
               width: 58,
               height: 58,
+              cacheWidth: 120,
+              cacheHeight: 120,
               fit: BoxFit.cover,
               errorBuilder: (_, __, ___) => _defaultVideoThumb(),
             );
@@ -1575,6 +1527,8 @@ class _MiniPlayerState extends State<MiniPlayer> {
                   snapshot.data!,
                   width: 58,
                   height: 58,
+                  cacheWidth: 120,
+                  cacheHeight: 120,
                   fit: BoxFit.cover,
                 ),
               ),

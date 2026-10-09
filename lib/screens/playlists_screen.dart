@@ -642,6 +642,8 @@ class _PlaylistDetailScreenState extends State<PlaylistDetailScreen> {
                 snapshot.data!,
                 width: 56,
                 height: 56,
+                cacheWidth: 100,
+                cacheHeight: 100,
                 fit: BoxFit.cover,
               ),
             );
