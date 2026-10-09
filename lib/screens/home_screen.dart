@@ -343,6 +343,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         drawerEnableOpenDragGesture: false,
+        drawerScrimColor: Colors.black.withValues(alpha: 0.45),
         extendBodyBehindAppBar: true,
         appBar: _VibeWaveAppBar(
           selectedIndex: _selectedDrawerIndex,
@@ -365,63 +366,64 @@ class _HomeScreenState extends State<HomeScreen> {
         drawer: Drawer(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.horizontal(
-                right: Radius.circular(28),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.55),
-                  blurRadius: 32,
-                  spreadRadius: 2,
-                  offset: const Offset(8, 0),
+          child: RepaintBoundary(
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: const BorderRadius.horizontal(
+                  right: Radius.circular(28),
                 ),
-                BoxShadow(
-                  color: Colors.orange.withValues(alpha: 0.08),
-                  blurRadius: 18,
-                  offset: const Offset(4, 0),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.horizontal(
-                right: Radius.circular(28),
-              ),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF141414).withValues(alpha: 0.88),
-                    border: Border(
-                      right: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.16),
-                        width: 1.2,
-                      ),
-                      top: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        width: 1.0,
-                      ),
-                      bottom: BorderSide(
-                        color: Colors.white.withValues(alpha: 0.08),
-                        width: 1.0,
-                      ),
-                    ),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.white.withValues(alpha: 0.08),
-                        Colors.white.withValues(alpha: 0.01),
-                        Colors.transparent,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 22,
+                    offset: const Offset(6, 0),
                   ),
-                  child: SafeArea(
-                    child: ListView(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      children: [
-                        _buildDrawerHeader(),
+                  BoxShadow(
+                    color: Colors.orange.withValues(alpha: 0.06),
+                    blurRadius: 14,
+                    offset: const Offset(2, 0),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: const BorderRadius.horizontal(
+                  right: Radius.circular(28),
+                ),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF141414).withValues(alpha: 0.76),
+                      border: Border(
+                        right: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.18),
+                          width: 1.2,
+                        ),
+                        top: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          width: 1.0,
+                        ),
+                        bottom: BorderSide(
+                          color: Colors.white.withValues(alpha: 0.08),
+                          width: 1.0,
+                        ),
+                      ),
+                      gradient: LinearGradient(
+                        colors: [
+                          Colors.white.withValues(alpha: 0.10),
+                          Colors.white.withValues(alpha: 0.02),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.35, 1.0],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: SafeArea(
+                      child: ListView(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        children: [
+                          _buildDrawerHeader(),
                         const SizedBox(height: 6),
                         _buildDrawerItem(
                           icon: Icons.home_rounded,
@@ -530,7 +532,8 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
         ),
-        body: IndexedStack(
+      ),
+      body: IndexedStack(
           index: _selectedDrawerIndex,
           children: List.generate(
             _screens.length,
@@ -1153,24 +1156,21 @@ class _ActionPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          width: 36,
-          height: 36,
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.10),
-              width: 1,
-            ),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.10),
+            width: 1,
           ),
-          child: child,
         ),
+        child: Center(child: child),
       ),
     );
   }
